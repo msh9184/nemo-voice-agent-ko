@@ -141,7 +141,7 @@ def load_stt_only_config():
     server_base_path = os.path.dirname(__file__)
     config_path = os.environ.get(
         "SERVER_CONFIG_PATH",
-        os.path.join(server_base_path, "server_configs", "stt_only.yaml")
+        os.path.join(server_base_path, "server_configs", "stt_only_mode.yaml")
     )
 
     if not os.path.exists(config_path):

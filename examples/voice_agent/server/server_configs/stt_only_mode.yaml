@@ -8,7 +8,7 @@
 #   - Legacy server: python ./server/stt_only_server.py
 #
 # Usage (Unified Server):
-#   export SERVER_CONFIG_PATH="./server/server_configs/stt_only.yaml"
+#   export SERVER_CONFIG_PATH="./server/server_configs/stt_only_mode.yaml"
 #   python ./server/server.py
 #
 # Service Mode: STT-ONLY (LLM=false, TTS=false)

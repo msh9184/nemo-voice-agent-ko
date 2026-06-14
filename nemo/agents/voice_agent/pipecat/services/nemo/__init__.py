@@ -15,43 +15,42 @@
 """
 NeMo Pipecat Services Package
 
-This module uses lazy imports to allow importing individual services
-without loading heavy dependencies (like vLLM for LLM service).
+This module uses lazy imports so individual services can be imported
+without pulling in heavy dependencies (e.g. vLLM for the LLM service).
 """
+
+# name -> (module, attribute)
+_LAZY = {
+    # ASR / STT
+    "NemoSTTService": (".stt", "NemoSTTService"),
+    # Diarization
+    "NemoDiarService": (".diar", "NemoDiarService"),
+    # LLM
+    "HuggingFaceLLMService": (".llm", "HuggingFaceLLMService"),
+    "HuggingFaceLLMLocalService": (".llm", "HuggingFaceLLMLocalService"),
+    "VLLMService": (".llm", "VLLMService"),
+    # TTS backends
+    "NeMoFastPitchHiFiGANTTSService": (".tts", "NeMoFastPitchHiFiGANTTSService"),
+    "KokoroTTSService": (".tts", "KokoroTTSService"),
+    "MeloTTSKoreanService": (".tts", "MeloTTSKoreanService"),
+    "CosyVoice3KoreanService": (".tts", "CosyVoice3KoreanService"),
+    "CosyVoiceKoreanService": (".tts", "CosyVoiceKoreanService"),
+    "FishSpeechKoreanService": (".tts", "FishSpeechKoreanService"),
+    "FishSpeechAPIService": (".tts", "FishSpeechAPIService"),
+    # Turn-taking
+    "NeMoTurnTakingService": (".turn_taking", "NeMoTurnTakingService"),
+}
 
 
 def __getattr__(name):
     """Lazy import for NeMo services to avoid loading unnecessary dependencies."""
-    if name == "NemoDiarService":
-        from .diar import NemoDiarService
-        return NemoDiarService
-    elif name == "HuggingFaceLLMService":
-        from .llm import HuggingFaceLLMService
-        return HuggingFaceLLMService
-    elif name == "NemoSTTService":
-        from .stt import NemoSTTService
-        return NemoSTTService
-    elif name == "NeMoFastPitchHiFiGANTTSService":
-        from .tts import NeMoFastPitchHiFiGANTTSService
-        return NeMoFastPitchHiFiGANTTSService
-    elif name == "FishSpeechService":
-        from .tts import FishSpeechService
-        return FishSpeechService
-    elif name == "FishSpeechAPIService":
-        from .tts import FishSpeechAPIService
-        return FishSpeechAPIService
-    elif name == "NeMoTurnTakingService":
-        from .turn_taking import NeMoTurnTakingService
-        return NeMoTurnTakingService
+    if name in _LAZY:
+        import importlib
+
+        module, attr = _LAZY[name]
+        mod = importlib.import_module(module, __name__)
+        return getattr(mod, attr)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = [
-    "NemoDiarService",
-    "HuggingFaceLLMService",
-    "NemoSTTService",
-    "NeMoFastPitchHiFiGANTTSService",
-    "FishSpeechService",
-    "FishSpeechAPIService",
-    "NeMoTurnTakingService",
-]
+__all__ = list(_LAZY.keys())

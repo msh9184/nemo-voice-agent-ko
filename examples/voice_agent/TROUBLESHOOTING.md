@@ -204,7 +204,7 @@ export HF_HUB_OFFLINE=1
 
 ### 로컬 모델 경로 사용
 ```yaml
-# server_configs/stt_only.yaml
+# server_configs/stt_only_mode.yaml
 stt:
   model: "/path/to/model/asr_model.nemo"
 ```

@@ -19,7 +19,7 @@ This server provides speech-to-text functionality without LLM or TTS.
 Use this for standalone ASR services.
 
 Usage:
-    export SERVER_CONFIG_PATH="./server/server_configs/stt_only.yaml"
+    export SERVER_CONFIG_PATH="./server/server_configs/stt_only_mode.yaml"
     python ./server/stt_only_server.py
 
 The server will:
@@ -42,10 +42,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(override=True)
 
-# Set default config path to stt_only.yaml if not specified
+# Set default config path to stt_only_mode.yaml if not specified
 if not os.environ.get("SERVER_CONFIG_PATH"):
     os.environ["SERVER_CONFIG_PATH"] = os.path.join(
-        os.path.dirname(__file__), "server_configs", "stt_only.yaml"
+        os.path.dirname(__file__), "server_configs", "stt_only_mode.yaml"
     )
 
 from stt_only_bot_websocket_server import run_stt_only_websocket_server

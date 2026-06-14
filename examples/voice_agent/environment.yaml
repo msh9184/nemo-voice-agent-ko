@@ -453,4 +453,3 @@ dependencies:
     - zipp==3.23.0
     - zstandard==0.25.0
     - espeakng==1.0.3
-prefix: /home/heh/anaconda3/envs/nemo2

@@ -701,26 +701,14 @@ tts:
 
 | Mode | Config File | STT | LLM | TTS | Input | Output |
 |------|-------------|-----|-----|-----|-------|--------|
-| **Full** | `default.yaml` | ✅ | ✅ | ✅ | Voice | Voice |
+| **Full** | `stt_llm_tts_mode.yaml` | ✅ | ✅ | ✅ | Voice | Voice |
 | **STT+LLM** | `stt_llm_mode.yaml` | ✅ | ✅ | ❌ | Voice | Text |
-| **STT-Only** | `stt_only.yaml` | ✅ | ❌ | ❌ | Voice | Text |
+| **STT-Only** | `stt_only_mode.yaml` | ✅ | ❌ | ❌ | Voice | Text |
 | **LLM+TTS** | `llm_tts_mode.yaml` | ❌ | ✅ | ✅ | Text | Voice |
 | **LLM-Only** | `llm_only_mode.yaml` | ❌ | ✅ | ❌ | Text | Text |
 | **TTS-Only** | `tts_only_mode.yaml` | ❌ | ❌ | ✅ | Text | Voice |
 
-### Mode Screenshots
-
-#### Full Mode (STT+LLM+TTS)
-<img src="images/stt_llm_tts_mode.png" width="700" alt="Full Mode">
-
-#### STT-Only Mode
-<img src="images/stt_only_mode.png" width="700" alt="STT-Only Mode">
-
-#### LLM-Only Mode
-<img src="images/llm_only_mode.png" width="700" alt="LLM-Only Mode">
-
-#### TTS-Only Mode
-<img src="images/tts_only_mode.png" width="700" alt="TTS-Only Mode">
+> `default.yaml` is the same full pipeline but routes TTS through the **Fish-Speech / OpenAudio API** (requires a separately launched API server on port 8080). For a self-contained full run, use `stt_llm_tts_mode.yaml` (FastPitch/Kokoro TTS).
 
 ### Pipeline Construction Per Mode
 
@@ -770,7 +758,7 @@ SERVER_CONFIG_PATH=./server/server_configs/stt_llm_mode.yaml \
 python ./server/server.py
 
 # STT-Only Mode (transcription service)
-SERVER_CONFIG_PATH=./server/server_configs/stt_only.yaml \
+SERVER_CONFIG_PATH=./server/server_configs/stt_only_mode.yaml \
 python ./server/server.py
 
 # LLM+TTS Mode (text input, voice output)
@@ -804,7 +792,6 @@ The CLI client provides a premium terminal interface with:
 - Color-coded visual indicators
 - Commands: `help`, `status`, `config`, `clear`, `quit`
 
-<img src="images/llm_only_text_client.png" width="600" alt="CLI Text Client">
 
 **Example Interaction:**
 ```
@@ -831,7 +818,6 @@ For audio input modes (STT-Only, STT+LLM, Full Voice Agent), you can upload audi
 - **Quality Control**: Use high-quality studio recordings for consistent testing
 - **Remote Access**: Upload audio from any device without microphone permissions
 
-<img src="images/stt_only_audio_file_upload.png" width="700" alt="STT-Only Audio File Upload">
 
 #### How to Use
 
@@ -880,7 +866,7 @@ For audio input modes (STT-Only, STT+LLM, Full Voice Agent), you can stream audi
 
 ```bash
 # Start server in STT-Only mode
-SERVER_CONFIG_PATH=./server/server_configs/stt_only.yaml python ./server/server.py
+SERVER_CONFIG_PATH=./server/server_configs/stt_only_mode.yaml python ./server/server.py
 
 # In another terminal, stream an audio file
 python audio_file_client.py --file test_audio.wav
