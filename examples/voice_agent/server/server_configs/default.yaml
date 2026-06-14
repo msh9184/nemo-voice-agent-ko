@@ -1,0 +1,300 @@
+# Korean Voice Agent Configuration with OpenAudio S1-mini TTS (API Mode)
+# =============================================================================
+# RECOMMENDED for low-latency real-time streaming voice agents.
+#
+# Architecture:
+#   [Voice Agent Server] ----HTTP API----> [Fish Speech API Server]
+#                                          (Model stays in GPU memory)
+#
+# Prerequisites:
+#   1. Start Fish Speech API server FIRST (in a separate terminal):
+#      cd /path/to/workspace
+#      export PYTHONPATH="/path/to/workspace"
+#      python -m tools.api_server \
+#          --listen 0.0.0.0:8080 \
+#          --llama-checkpoint-path "/path/to/model" \
+#          --decoder-checkpoint-path "/path/to/model" \
+#          --decoder-config-name modded_dac_vq \
+#          --compile
+#
+#   2. Then start Voice Agent server:
+#      SERVER_CONFIG_PATH=./server_configs/korean_voice_agent_fish_speech_api.yaml python server.py
+#
+# Performance:
+#   - Subprocess mode: ~30-100 seconds per TTS call
+#   - API mode: ~1-3 seconds per TTS call (after warmup)
+#
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 10
+
+# =============================================================================
+# Audio Quality Configuration
+# =============================================================================
+# Controls the trade-off between audio quality and latency/bandwidth
+#
+# quality_mode:
+#   - "high_quality": Preserve TTS native sample rate (44100Hz for Fish Speech)
+#                     Best audio quality, higher bandwidth
+#   - "low_latency": Resample to 16000Hz for smaller frames
+#                    Lower quality but faster transmission
+#
+# output_sample_rate:
+#   - "native": Automatically use TTS model's native rate (recommended)
+#   - 16000: Low quality, low bandwidth
+#   - 24000: Medium quality
+#   - 44100: High quality (CD quality)
+#   - 48000: Professional quality
+# =============================================================================
+audio:
+  quality_mode: "high_quality"
+  output_sample_rate: "native"  # Use TTS native rate (44100Hz for Fish Speech)
+
+# Voice Activity Detection
+# NOTE: stop_secs reduced from 1.2 to 0.6 for faster turn-taking
+# This allows quicker response when user finishes speaking
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 0.6 # 1.2
+  min_volume: 0.4
+
+# Speech-to-Text Configuration (Korean Fast-Conformer)
+stt:
+  type: nemo
+  # model: "/path/to/model/asr_model.nemo"
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+
+  # ============= Special Token Filtering =============
+  # Tokens to filter from display output (web UI)
+  # These tokens will be removed from the text shown to users
+  # but preserved in result["raw_text"] for LLM context
+  filter_display_tokens:
+    # Language tokens (문장 앞뒤에 나타남)
+    - "<lan_unk>"
+    - "<lan_de>"
+    - "<lan_en>"
+    - "<lan_es>"
+    - "<lan_fr>"
+    - "<lan_hi>"
+    - "<lan_it>"
+    - "<lan_ja>"
+    - "<lan_ko>"
+    - "<lan_pl>"
+    - "<lan_pt>"
+    - "<lan_th>"
+    - "<lan_vi>"
+    - "<lan_zh>"
+    # Other special tokens (선택적으로 추가)
+    # - "<noise>"
+    # - "<spokennoise>"
+    # - "<laugh>"
+    # - "<sil>"
+
+  # Preserve original text (with tokens) for LLM in result["raw_text"]
+  # Set to true if you want LLM to see language/special tokens
+  preserve_raw_for_llm: true
+
+  # Extract detected language from <lan_XX> tokens
+  # Stores in result["detected_language"] (e.g., "ko", "en")
+  extract_language_info: true
+
+# Speaker Diarization (disabled for lower latency)
+diar:
+  type: nemo
+  enabled: false
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4
+  frame_len_in_secs: 0.08
+
+# Turn Taking Configuration
+turn_taking:
+  backchannel_phrases_path: "./server/backchannel_phrases.yaml"  # set it to the actual path of the file, or specify a list of backchannel phrases here
+  max_buffer_size: 2  # num of words more than this amount will interrupt the LLM immediately if not backchannel phrases
+  bot_stop_delay: 0.1  # a delay in seconds allowed between server and client audio output, so that the BotStopSpeaking signal is handled not too far away from the actual time that the user hears all audio output
+
+# Large Language Model Configuration (Korean LLM (any Hugging Face causal LM))
+# =============================================================================
+# Service Mode Control:
+#   - enabled: true  -> LLM processing active (default)
+#   - enabled: false -> LLM disabled, STT-only mode
+# =============================================================================
+llm:
+  enabled: true  # Set to false for STT-only mode
+  type: hf
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  enable_reasoning: false
+
+  # Korean system prompt
+  system_prompt: |
+    [정체성]
+    당신의 이름은 모시입니다. 음성으로 사람과 대화할 수 있는 AI 음성 어시스턴트입니다.
+
+    [스타일]
+    - 전문적이면서도 친근하게 대화하세요
+    - 자연스러운 말투를 사용하고, 가끔 "음...", "그러니까..." 같은 표현을 넣으세요
+    - 숫자는 자연스럽게 읽으세요: "120억"이 아닌 "백이십억"
+    - 음성 AI 어시스턴트로서 대화체를 유지하세요
+
+    [음성 지침]
+    - 음성 품질: 명확하고 또렷하게
+    - 속도: 차분하고 적절한 속도로, 복잡한 내용에서는 잠시 멈춤
+    - 발음: 기술 용어도 명확하게 발음
+    - 전달: 설명과 대화를 자연스럽게 오가며
+    - 톤: 자신감 있고 친절하게
+
+    [응답 지침]
+    - 음성 명확성을 위해 응답은 간결하게, 최대 오백자 이내
+    - 필요할 때 한 번에 하나씩 확인 질문
+    - 정보는 이해하기 쉬운 단위로 나누어 전달
+    - 자연스러운 말투를 위해 가끔 "음", "그러니까" 사용
+    - 별표, 이모지, 특수 문자 사용 금지
+    - 기술 용어와 약어는 풀어서 발음하기 쉽게
+
+    [핵심 원칙]
+    1. 정확한 기술 정보 제공
+    2. 다양한 관점에서 분석
+    3. 사용자 이해 수준에 맞춰 설명
+
+    [작업 및 목표]
+    1. 사용자 질문을 듣고 기술 수준과 의도 파악
+    2. 기술 질문: 상세하고 다각적인 전문 지식 제공
+    3. 창의적 요청: 혁신적인 솔루션 제안
+    4. 학습 상황: 탐구를 장려하며 설명 수준 조절
+
+    [대화 흐름]
+    - 사용자를 따뜻하게 맞이하고 필요 파악
+    - 포괄적이면서도 이해하기 쉬운 응답 제공
+    - 이해를 돕기 위한 후속 질문 제안
+
+    [오류 처리]
+    사용자 요청이 불명확하면 구체적인 확인 질문을 하세요. 전문 분야 밖이면 한계를 인정하면서 관련 정보를 제공하세요.
+
+    [화자 태그]
+    사용자 컨텍스트에 화자 태그(<speaker_0>, <speaker_1> 등)가 보일 수 있습니다. 화자 태그와 맥락에 따라 응답하세요. 응답에 화자 태그를 포함하지 마세요.
+
+    [ASR 언어 토큰 이해]
+    음성 인식 결과에 언어 태그가 포함될 수 있습니다. 이 태그들은 사용자가 발화한 언어를 나타냅니다:
+    - <lan_ko>: 한국어
+    - <lan_en>: 영어
+    - <lan_ja>: 일본어
+    - <lan_zh>: 중국어
+    - <lan_de>: 독일어
+    - <lan_es>: 스페인어
+    - <lan_fr>: 프랑스어
+    - <lan_it>: 이탈리아어
+    - <lan_pt>: 포르투갈어
+    - <lan_hi>: 힌디어
+    - <lan_th>: 태국어
+    - <lan_vi>: 베트남어
+    - <lan_pl>: 폴란드어
+    - <lan_unk>: 인식 불가
+
+    언어 태그가 보이면 해당 언어로 응답하거나, 한국어로 응답하되 외국어 단어는 적절히 이해하세요. 응답에 언어 태그를 절대 포함하지 마세요.
+
+    [ASR 특수 토큰 이해]
+    음성 인식 결과에 다음과 같은 특수 토큰이 포함될 수 있습니다:
+    - <noise>: 배경 잡음이 감지됨
+    - <spokennoise>: 발화 중 노이즈 (기침, 목청 가다듬기 등)
+    - <laugh>: 웃음 소리
+    - <sil>: 침묵 구간
+    - <fil/>: 간투어 (음, 어, 그러니까 등의 필러)
+    - <sc>: 화자 변경 (다른 사람이 말하기 시작함)
+    - <eos>: 문장 종료
+
+    이러한 토큰들은 대화 맥락을 이해하는 데 활용하세요:
+    - <laugh>가 있으면 사용자가 유쾌한 분위기임을 감안하세요
+    - <noise>가 많으면 주변이 시끄러운 환경일 수 있으니 명확하게 응답하세요
+    - <fil/>이 많으면 사용자가 생각하며 말하는 중일 수 있으니 인내심을 가지세요
+    - <sc>가 있으면 대화에 여러 사람이 참여 중일 수 있습니다
+
+    응답에 특수 토큰을 절대 포함하지 마세요. 자연스러운 한국어로만 응답하세요.
+
+    [중요 규칙]
+    - 모든 ASR 토큰 (언어 태그, 특수 토큰, 화자 태그)은 응답에 절대 포함하지 마세요
+    - 토큰 정보는 맥락 이해에만 활용하고, 출력은 깨끗한 자연어로만 하세요
+    - 사용자가 토큰에 대해 질문하면, 음성 인식 시스템의 내부 표기임을 간단히 설명하세요
+
+    시작 직후 자연스러운 톤으로 이야기 하듯 자신을 소개해 주세요. 
+
+# Text-to-Speech Configuration (OpenAudio S1-mini via HTTP API)
+# =============================================================================
+# RECOMMENDED: Use API mode for low-latency real-time streaming.
+#
+# The Fish Speech API server must be running BEFORE starting Voice Agent.
+# See prerequisites above.
+#
+# Voice Cloning Workflow:
+#   1. Set reference_audio_path and reference_audio_text below
+#   2. On server startup, the reference audio is automatically registered
+#      with the Fish Speech API via /v1/references/add
+#   3. A unique reference_id is generated based on file content hash
+#   4. All TTS requests use this reference_id for consistent voice
+#   5. reference_id is cached, so restarts with same audio reuse the ID
+#
+# Service Mode Control:
+#   - enabled: true  -> TTS synthesis active (default)
+#   - enabled: false -> TTS disabled, text-only output
+#   Note: If llm.enabled=true and tts.enabled=false, this creates STT+LLM mode
+#         (voice input, text output chatbot)
+# =============================================================================
+tts:
+  enabled: true  # Set to false for text-only output mode
+  type: fish_speech_api
+
+  # Fish Speech API server URL
+  # Default: http://localhost:8080
+  api_url: "http://localhost:8080"
+
+  # Device is handled by API server (not used here)
+  device: "cuda:0"
+
+  # Voice cloning settings
+  # -----------------------------------------------------------------------------
+  # For consistent voice, provide a 10-30 second Korean reference audio.
+  # The reference audio will be automatically registered on server startup.
+  # -----------------------------------------------------------------------------
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+  reference_audio_path: "/path/to/reference_voice.wav"
+  reference_audio_text: "<exact transcript of your reference audio>"
+
+  # Optional: Pre-registered reference ID
+  # If you already registered a reference via Fish Speech API, set its ID here.
+  # This skips auto-registration and uses the existing reference directly.
+  reference_id: null  # e.g., "voice_agent_korean_voice_abc123"
+
+  # Memory caching for faster inference
+  # "on": Enable VQ token caching (faster, uses more GPU memory)
+  # "off": Disable caching (slower, uses less GPU memory)
+  use_memory_cache: "on"
+
+  # API request timeout (seconds)
+  timeout: 60
+
+  # Text segmentation for streaming TTS
+  # Includes Korean punctuation marks for proper sentence boundaries
+  extra_separator:
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+    - "。"   # Korean/Japanese full stop
+    - "？"   # Korean/Japanese question mark
+    - "！"   # Korean/Japanese exclamation mark
+    # - ','
+    # - ";"
+    # - ":"
+    # - "、"   # Korean/Japanese comma
+
+  # Think tokens (null for no filtering)
+  think_tokens: null

@@ -1,0 +1,73 @@
+# Korean Voice Agent Configuration (Kokoro TTS variant)
+# Full STT-LLM-TTS Pipeline for Korean language using Kokoro-82M
+#
+# Components:
+#   - STT: NeMo Fast-Conformer (Korean)
+#   - LLM: Korean LLM (any Hugging Face causal LM)
+#   - TTS: Kokoro-82M with Korean language support
+#
+# Usage:
+#   SERVER_CONFIG_PATH=./server_configs/korean_voice_agent_kokoro.yaml python server.py
+#
+# Note: Kokoro may have better quality in some cases but requires more GPU memory
+
+transport:
+  audio_out_10ms_chunks: 10
+
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.2
+  min_volume: 0.4
+
+# Speech-to-Text Configuration (Korean Fast-Conformer)
+stt:
+  type: nemo
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+
+diar:
+  type: nemo
+  enabled: false
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4
+  frame_len_in_secs: 0.08
+
+turn_taking:
+  backchannel_phrases_path: null
+  max_buffer_size: 3
+  bot_stop_delay: 0.5
+
+# Large Language Model Configuration (Korean LLM (any Hugging Face causal LM))
+llm:
+  type: hf
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  enable_reasoning: false
+
+  system_prompt: |
+    당신은 친절하고 도움이 되는 한국어 AI 어시스턴트 '리사'입니다.
+    먼저 사용자에게 따뜻하게 인사하고 한 문장으로 자신을 소개하세요.
+    답변은 간결하고 핵심적으로 해주세요.
+    이모지는 사용하지 마세요.
+    자연스러운 한국어로 대화해 주세요.
+
+# Text-to-Speech Configuration (Kokoro Korean)
+# Kokoro-82M with Korean language support (lang_code='k')
+tts:
+  type: kokoro_korean
+  model: "hexgrad/Kokoro-82M"
+  sub_model_id: "kf_yujeong"  # Korean female voice
+  device: "cuda:0"
+  speed: 1.0
+  extra_separator:
+    - ','
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+  think_tokens: null

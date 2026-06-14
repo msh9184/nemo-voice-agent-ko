@@ -1,0 +1,191 @@
+# Backchannel Phrases for Voice Agent
+# These short phrases indicate listener engagement without interrupting the speaker
+# Used to filter out non-substantive responses that don't require LLM processing
+
+# =============================================================================
+# Korean Backchannel Phrases (한국어)
+# =============================================================================
+
+# --- 기본 긍정/인지 (Basic Acknowledgment) ---
+- "네"
+- "네네"
+- "네네네"
+- "예"
+- "예예"
+- "응"
+- "응응"
+- "음"
+- "음음"
+- "아"
+- "아아"
+- "어"
+- "어어"
+
+# --- 동의/이해 (Agreement/Understanding) ---
+- "그렇구나"
+- "그렇군"
+- "그렇군요"
+- "그렇네"
+- "그렇네요"
+- "그러네"
+- "그러네요"
+- "그렇죠"
+- "그러게"
+- "그러게요"
+
+# --- 맞장구 (Affirmative Responses) ---
+- "맞네"
+- "맞네요"
+- "그치"
+- "그쵸"
+- "진짜"
+- "진짜요"
+- "진짜로"
+- "정말"
+- "정말요"
+- "정말로"
+
+# --- 흥미/놀람 (Interest/Surprise) ---
+- "오"
+- "오오"
+- "와"
+- "와아"
+- "우와"
+- "대박"
+- "헐"
+- "어머"
+- "어머나"
+- "세상에"
+- "아이고"
+
+# --- 긍정적 반응 (Positive Reactions) ---
+- "좋아"
+- "좋아요"
+- "좋습니다"
+- "좋네"
+- "좋네요"
+- "잘됐다"
+- "잘됐네"
+- "잘됐네요"
+- "괜찮아"
+- "괜찮아요"
+- "괜찮네"
+- "괜찮네요"
+- "좋겠다"
+- "좋겠네"
+- "좋겠네요"
+- "다행이다"
+- "다행이네"
+- "다행이네요"
+
+# --- 기타 (Others) ---
+- "그래그래"
+- "응응 그래"
+- "네 그래요"
+- "아 그래"
+- "아 그래요"
+- "아 네"
+- "아 예"
+- "음 그래"
+- "음 그래요"
+- "어 그래"
+- "오케이"
+- "오키"
+- "굿"
+- "ㅇㅋ"
+
+# =============================================================================
+# English Backchannel Phrases (영어)
+# =============================================================================
+
+# --- Basic Acknowledgment ---
+- "absolutely"
+- "ah"
+- "all right"
+- "alright"
+- "but yeah"
+- "cool"
+- "definitely"
+- "exactly"
+- "go ahead"
+- "good"
+- "great"
+- "great thanks"
+
+# --- Filler/Thinking Sounds ---
+- "ha ha"
+- "hmm"
+- "humm"
+- "huh"
+- "mhmm"
+- "mhmm mhmm"
+- "mhmm right"
+- "mhmm yeah"
+- "mhmm yes"
+- "mm hmm"
+- "mmhmm"
+- "uh huh"
+- "uh-huh"
+- "uh-huh yeah"
+- "uhhuh"
+- "uhhuh okay"
+- "um-humm"
+
+# --- Agreement/Understanding ---
+- "i know"
+- "i know right"
+- "i see"
+- "indeed"
+- "interesting"
+- "nice"
+- "of course"
+- "really"
+- "right"
+- "right exactly"
+- "right right"
+- "right yeah"
+- "sure"
+- "sure thing"
+- "thats right"
+- "thats true"
+- "true"
+
+# --- Surprise/Interest ---
+- "oh"
+- "oh dear"
+- "oh man"
+- "oh okay"
+- "oh wow"
+- "oh yes"
+- "well"
+- "what"
+- "wow"
+
+# --- Okay Variations ---
+- "ok"
+- "ok thanks"
+- "okay"
+- "okay okay"
+- "okay thanks"
+
+# --- Affirmative ---
+- "perfect"
+- "so yeah"
+- "sounds good"
+- "that's awesome"
+- "yeah"
+- "yeah i know"
+- "yeah i see"
+- "yeah mhmm"
+- "yeah okay"
+- "yeah right"
+- "yeah uh-huh"
+- "yeah yeah"
+- "yep"
+- "yes"
+- "yes please"
+- "yes yes"
+
+# --- Thanks ---
+- "thank you"
+- "thanks"

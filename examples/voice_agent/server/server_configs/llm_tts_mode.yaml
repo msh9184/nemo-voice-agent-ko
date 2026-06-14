@@ -1,0 +1,169 @@
+# LLM+TTS Mode Configuration
+# =============================================================================
+# Text Input -> LLM -> TTS -> Audio Output
+# Use case: Text chatbot with voice response
+#
+# This mode:
+# - Receives text input via RTVI action (text_input:send)
+# - Processes through LLM for response generation
+# - Synthesizes LLM response to audio via TTS
+# - Returns audio stream (voice response to text input)
+# - No microphone required, but speaker needed for audio output
+#
+# Usage:
+#   export SERVER_CONFIG_PATH="./server/server_configs/llm_tts_mode.yaml"
+#   python ./server/server.py
+#
+# Service Mode: LLM+TTS (STT=false, LLM=true, TTS=true)
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 4  # Standard for audio output
+
+# =============================================================================
+# Audio Quality Configuration
+# =============================================================================
+# Controls the trade-off between audio quality and latency/bandwidth
+#
+# quality_mode:
+#   - "high_quality": Preserve TTS native sample rate (44100Hz for Fish Speech)
+#                     Best audio quality, higher bandwidth
+#   - "low_latency": Resample to 16000Hz for smaller frames
+#                    Lower quality but faster transmission
+#
+# output_sample_rate:
+#   - "native": Automatically use TTS model's native rate (recommended)
+#   - 16000: Low quality, low bandwidth
+#   - 24000: Medium quality
+#   - 44100: High quality (CD quality)
+#   - 48000: Professional quality
+# =============================================================================
+audio:
+  quality_mode: "high_quality"
+  output_sample_rate: "native"  # Use TTS native rate (44100Hz for Fish Speech)
+
+# =============================================================================
+# STT Configuration (DISABLED for text input mode)
+# =============================================================================
+stt:
+  enabled: false
+  # Placeholder values (not loaded when enabled=false)
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+
+# VAD not needed for text input
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.0
+  min_volume: 0.4
+
+# Diarization not meaningful without voice input
+diar:
+  enabled: false
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+  threshold: 0.5
+  frame_len_in_secs: 0.08
+
+# =============================================================================
+# LLM Configuration (ENABLED)
+# =============================================================================
+llm:
+  enabled: true  # Enable LLM for chatbot functionality
+  type: hf
+  # ============================================================================
+  # MODEL OPTIONS:
+  # ============================================================================
+  # Option 1: HuggingFace Model (requires network access)
+  # model: "nvidia/NVIDIA-Nemotron-Nano-9B-v2"        # Recommended, 21GB VRAM
+  # model: "Qwen/Qwen2.5-7B-Instruct"                 # Alternative, ~16GB VRAM
+  # model: "meta-llama/Llama-3.1-8B-Instruct"         # Alternative, ~17GB VRAM
+  #
+  # Option 2: Local path (for offline/network-restricted environments)
+  # model: "/path/to/your/local/model"
+  # ============================================================================
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  max_tokens: 512
+  temperature: 0.7
+  enable_reasoning: false
+
+  system_prompt: |
+    [정체성]
+    당신은 음성으로 대화하는 AI 텍스트 어시스턴트입니다.
+    사용자의 음성 입력을 텍스트로 받아 텍스트로 응답합니다.
+
+    [스타일]
+    - 전문적이면서도 친근하게 대화하세요
+    - 응답은 간결하고 명확하게 작성하세요
+    - 음성 출력이 없으므로 특수 기호나 이모지를 적절히 활용해도 됩니다
+
+    [응답 지침]
+    - 최대 500자 이내로 응답
+    - 필요시 확인 질문
+    - 정보는 이해하기 쉽게 구조화
+
+  # Optional: Custom system prompt
+  # system_prompt: "You are a helpful AI assistant. Respond concisely as your responses will be spoken aloud."
+
+# =============================================================================
+# TTS Configuration (ENABLED)
+# =============================================================================
+tts:
+  enabled: true  # Set to false for text-only output mode
+  type: fish_speech_api
+
+  # Fish Speech API server URL
+  # Default: http://localhost:8080
+  api_url: "http://localhost:8080"
+
+  # Device is handled by API server (not used here)
+  device: "cuda:0"
+
+  # Voice cloning settings
+  # -----------------------------------------------------------------------------
+  # For consistent voice, provide a 10-30 second Korean reference audio.
+  # The reference audio will be automatically registered on server startup.
+  # -----------------------------------------------------------------------------
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+  reference_audio_path: "/path/to/reference_voice.wav"
+  reference_audio_text: "<exact transcript of your reference audio>"
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+
+  # Optional: Pre-registered reference ID
+  # If you already registered a reference via Fish Speech API, set its ID here.
+  # This skips auto-registration and uses the existing reference directly.
+  reference_id: null  # e.g., "voice_agent_korean_voice_abc123"
+
+  # Memory caching for faster inference
+  # "on": Enable VQ token caching (faster, uses more GPU memory)
+  # "off": Disable caching (slower, uses less GPU memory)
+  use_memory_cache: "on"
+
+  # API request timeout (seconds)
+  timeout: 60
+
+  # Text segmentation for streaming TTS
+  # Includes Korean punctuation marks for proper sentence boundaries
+  extra_separator:
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+    - "。"   # Korean/Japanese full stop
+    - "？"   # Korean/Japanese question mark
+    - "！"   # Korean/Japanese exclamation mark
+    # - ','
+    # - ";"
+    # - ":"
+    # - "、"   # Korean/Japanese comma
+
+  # Think tokens (null for no filtering)
+  think_tokens: null

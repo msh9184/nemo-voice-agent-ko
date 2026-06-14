@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeMo Korean Voice Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Base fonts - Premium casual & modern fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Quicksand:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Korean fonts for beautiful text display (includes Gothic A1 for premium look) -->
+  <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=Noto+Serif+KR:wght@400;500;600&family=Gowun+Dodum&family=Nanum+Gothic:wght@400;700&family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- SUIT (Premium Korean font by sunn) - Modern, clean, luxurious -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sunn-us/SUIT@2/fonts/variable/woff2/SUIT-Variable.min.css">
+  <!-- Pretendard (premium Korean font) via CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+  <!-- Spoqa Han Sans Neo (startup-favorite Korean font) -->
+  <link href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css" rel="stylesheet">
+</head>
+
+<body>
+<div class="app-container">
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="logo">
+        <!-- Logo images: Dark theme uses white logo, Light theme uses black logo -->
+        <img src="/images/logo_white.png" alt="Logo" class="logo-image logo-dark" />
+        <img src="/images/logo_black.png" alt="Logo" class="logo-image logo-light" />
+      </div>
+      <div class="mode-badges">
+        <span class="mode-badge mode-stt" id="stt-badge">STT</span>
+        <span class="mode-badge mode-llm" id="llm-badge">LLM</span>
+        <span class="mode-badge mode-tts" id="tts-badge">TTS</span>
+        <span class="mode-badge mode-diar" id="diar-badge">DIAR</span>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+
+      <div class="server-indicator">
+        <span class="server-badge">Voice Agent</span>
+        <span class="server-port">:7860</span>
+      </div>
+
+      <div class="connection-status" id="connection-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text" id="connection-status">Disconnected</span>
+      </div>
+
+      <div class="control-buttons">
+        <button id="connect-btn" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+          Connect
+        </button>
+        <button id="disconnect-btn" class="btn btn-danger" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Disconnect
+        </button>
+        <button id="mute-btn" class="btn btn-secondary" disabled>
+          <svg class="mic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          </svg>
+          <svg class="mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+          </svg>
+          <span class="btn-text">Mute</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    <!-- Left Sidebar: Settings Panel -->
+    <aside class="sidebar sidebar-left" id="settings-sidebar">
+      <div class="sidebar-header">
+        <h2>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </h2>
+        <button class="btn-icon btn-reset-config" id="reset-config-btn" title="Reset to defaults">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="settings-content" id="settings-content">
+        <!-- VAD Settings -->
+        <div class="settings-section" data-section="vad">
+          <div class="section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            </svg>
+            <span>Voice Activity Detection</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <div class="setting-item">
+              <label>Confidence Threshold</label>
+              <div class="slider-group">
+                <input type="range" id="vad-confidence" min="0" max="1" step="0.05" value="0.6">
+                <span class="slider-value" id="vad-confidence-value">0.6</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Stop Silence (sec)</label>
+              <div class="slider-group">
+                <input type="range" id="vad-stop-secs" min="0.1" max="5" step="0.1" value="1.0">
+                <span class="slider-value" id="vad-stop-secs-value">1.0s</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Start Duration (sec)</label>
+              <div class="slider-group">
+                <input type="range" id="vad-start-secs" min="0.01" max="1" step="0.01" value="0.1">
+                <span class="slider-value" id="vad-start-secs-value">0.1s</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Min Volume</label>
+              <div class="slider-group">
+                <input type="range" id="vad-min-volume" min="0" max="1" step="0.05" value="0.4">
+                <span class="slider-value" id="vad-min-volume-value">0.4</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aggregator Settings -->
+        <div class="settings-section" data-section="aggregator">
+          <div class="section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="21" y1="10" x2="3" y2="10"/>
+              <line x1="21" y1="6" x2="3" y2="6"/>
+              <line x1="21" y1="14" x2="3" y2="14"/>
+              <line x1="21" y1="18" x2="3" y2="18"/>
+            </svg>
+            <span>Text Aggregator</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <div class="setting-item">
+              <label>Max Words</label>
+              <div class="slider-group">
+                <input type="range" id="aggregator-max-words" min="5" max="100" step="1" value="20">
+                <span class="slider-value" id="aggregator-max-words-value">20</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Min Words</label>
+              <div class="slider-group">
+                <input type="range" id="aggregator-min-words" min="1" max="20" step="1" value="3">
+                <span class="slider-value" id="aggregator-min-words-value">3</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Silence Timeout (sec)</label>
+              <div class="slider-group">
+                <input type="range" id="aggregator-silence-timeout" min="0.5" max="30" step="0.5" value="3.0">
+                <span class="slider-value" id="aggregator-silence-timeout-value">3.0s</span>
+              </div>
+            </div>
+            <div class="setting-item toggle-item">
+              <label>Console Display</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="aggregator-console-display" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display Settings -->
+        <div class="settings-section" data-section="display">
+          <div class="section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <span>Display Settings</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <div class="setting-item">
+              <label>Default Language</label>
+              <div class="select-group">
+                <select id="default-language-select">
+                  <option value="en">English</option>
+                  <option value="ko" selected>한국어 (Korean)</option>
+                  <option value="auto">Auto Detect</option>
+                </select>
+              </div>
+              <span class="setting-hint">Primary language for transcription</span>
+            </div>
+            <div class="setting-item">
+              <label>Font Style</label>
+              <div class="select-group">
+                <select id="font-style-select">
+                  <optgroup label="프리미엄 폰트">
+                    <option value="default" selected>SUIT (고급/세련됨)</option>
+                    <option value="premium">Gothic A1 (프리미엄)</option>
+                    <option value="modern">Pretendard (모던/깔끔)</option>
+                  </optgroup>
+                  <optgroup label="한글 폰트">
+                    <option value="noto-sans">Noto Sans KR (기본)</option>
+                    <option value="casual">Gowun Dodum (캐주얼)</option>
+                    <option value="elegant">Noto Serif KR (명조체)</option>
+                    <option value="nanum">Nanum Gothic (나눔고딕)</option>
+                    <option value="handwriting">Nanum Pen Script (손글씨)</option>
+                    <option value="playful">Gaegu (귀여움)</option>
+                  </optgroup>
+                  <optgroup label="영문 폰트">
+                    <option value="courier">Courier New</option>
+                    <option value="consolas">Consolas</option>
+                    <option value="mono">JetBrains Mono</option>
+                  </optgroup>
+                </select>
+              </div>
+              <span class="setting-hint">Choose font for transcription display</span>
+            </div>
+            <div class="setting-item">
+              <label>Font Size</label>
+              <div class="slider-group">
+                <input type="range" id="font-size-slider" min="14" max="32" step="2" value="20">
+                <span class="slider-value" id="font-size-value">20px</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STT Settings -->
+        <div class="settings-section" data-section="stt">
+          <div class="section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Speech Recognition</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <div class="setting-item">
+              <label>Attention Context</label>
+              <div class="select-group">
+                <select id="stt-att-context">
+                  <option value="70,0">[70, 0] - No lookahead</option>
+                  <option value="70,1" selected>[70, 1] - 1 frame lookahead</option>
+                  <option value="70,6">[70, 6] - 6 frame lookahead</option>
+                  <option value="70,13">[70, 13] - 13 frame lookahead</option>
+                </select>
+              </div>
+              <p class="setting-hint">Higher lookahead = better accuracy, more latency</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diarization Settings -->
+        <div class="settings-section" data-section="diar" id="diar-settings">
+          <div class="section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Speaker Diarization</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <div class="setting-item">
+              <label>Max Speakers</label>
+              <div class="slider-group">
+                <input type="range" id="diar-max-speakers" min="1" max="4" step="1" value="4">
+                <span class="slider-value" id="diar-max-speakers-value">4</span>
+              </div>
+            </div>
+            <div class="setting-item">
+              <label>Detection Threshold</label>
+              <div class="slider-group">
+                <input type="range" id="diar-threshold" min="0.1" max="0.9" step="0.05" value="0.4">
+                <span class="slider-value" id="diar-threshold-value">0.4</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-outline btn-apply" id="apply-config-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Apply Changes
+        </button>
+      </div>
+      <!-- Resize Handle for Left Sidebar -->
+      <div class="resize-handle resize-handle-horizontal" id="resize-left-sidebar" data-target="settings-sidebar" data-direction="right"></div>
+    </aside>
+
+    <!-- Center: Voice Agent Main Area -->
+    <section class="transcript-area">
+      <!-- Voice Agent Conversation View - MAIN SECTION -->
+      <div class="conversation-zone main-conversation" id="conversation-zone">
+        <div class="conversation-header">
+          <div class="conversation-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <h2>Voice Agent</h2>
+            <span class="conversation-subtitle">AI 음성 대화</span>
+          </div>
+          <div class="conversation-controls">
+            <div class="bot-status-indicator" id="bot-status-indicator">
+              <span class="status-icon bot-icon"></span>
+              <span class="status-text" id="bot-status-text">대기 중</span>
+            </div>
+            <button class="btn-icon btn-clear-conversation" id="clear-conversation-btn" title="Clear conversation">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="conversation-content" id="conversation-view">
+          <div class="conversation-empty">
+            <div class="empty-icon"><span class="icon-mic"></span></div>
+            <p>대화를 시작하세요</p>
+            <span>Connect 버튼을 누르고 마이크에 말하면 AI가 응답합니다</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           TEXT INPUT ZONE - For Text Input Modes (LLM-Only, TTS-Only, LLM+TTS)
+           Hidden by default, shown when STT is disabled
+           ======================================== -->
+      <div class="io-zone text-input-zone" id="text-input-zone" style="display: none;">
+        <div class="io-zone-header">
+          <div class="io-zone-title">
+            <svg class="io-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            <span class="io-label">Input</span>
+            <span class="io-sublabel">Text</span>
+          </div>
+          <div class="io-zone-controls">
+            <div class="io-status-badge text-input-status" id="text-input-status-badge">
+              <span class="status-dot"></span>
+              <span class="status-label">Ready</span>
+            </div>
+          </div>
+        </div>
+        <div class="io-zone-body text-input-body">
+          <div class="text-input-wrapper">
+            <textarea
+              id="text-input-textarea"
+              class="text-input-textarea"
+              placeholder="메시지를 입력하세요... (Enter로 전송, Shift+Enter로 줄바꿈)"
+              rows="3"
+            ></textarea>
+            <div class="text-input-actions">
+              <span class="text-input-hint">Enter to send | Shift+Enter for new line</span>
+              <button class="btn btn-primary text-send-btn" id="text-send-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           INPUT ZONE - Microphone Input + Real-time STT
+           (For Voice Input Modes)
+           ======================================== -->
+      <div class="io-zone input-zone" id="input-zone">
+        <div class="io-zone-header">
+          <div class="io-zone-title">
+            <svg class="io-icon mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            <svg class="io-icon file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            <span class="io-label">Input</span>
+            <span class="io-sublabel" id="input-mode-label">Microphone</span>
+          </div>
+          <div class="io-zone-controls">
+            <!-- Input Mode Toggle (Mic / File) -->
+            <div class="input-mode-toggle" id="input-mode-toggle">
+              <button class="mode-btn active" id="mode-mic-btn" title="Microphone Input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                </svg>
+              </button>
+              <button class="mode-btn" id="mode-file-btn" title="Audio File Upload">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </button>
+            </div>
+            <div class="io-status-badge" id="input-status-badge">
+              <span class="status-dot"></span>
+              <span class="status-label">Ready</span>
+            </div>
+            <button class="btn-icon-sm" id="clear-stt-stream-btn" title="Clear STT">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="io-zone-body">
+          <!-- Waveform Visualization -->
+          <div class="io-waveform-section">
+            <div class="io-volume-meter">
+              <div class="volume-bar-bg">
+                <div class="volume-bar" id="input-volume-bar"></div>
+              </div>
+              <span class="volume-value" id="input-volume-text">0%</span>
+            </div>
+            <canvas id="input-waveform-canvas" class="io-waveform-canvas"></canvas>
+          </div>
+          <!-- Real-time STT Text -->
+          <div class="io-text-section">
+            <div class="io-text-header">
+              <span class="text-section-label">Real-time STT</span>
+              <div class="live-indicator" id="stt-live-indicator">
+                <span class="pulse-dot"></span>
+                <span class="live-text">LIVE</span>
+              </div>
+            </div>
+            <div class="io-text-content" id="stt-stream-content">
+              <div class="stream-flow" id="stt-stream-flow">
+                <span class="stream-placeholder">마이크에 말하면 실시간 텍스트가 표시됩니다...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- File Upload Section (Hidden by default, shown in file mode) -->
+          <div class="file-upload-section" id="file-upload-section" style="display: none;">
+            <!-- Drop Zone - Compact Horizontal -->
+            <div class="file-dropzone" id="file-dropzone">
+              <div class="dropzone-content">
+                <div class="dropzone-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+                <div class="dropzone-text-wrapper">
+                  <p class="dropzone-text">오디오 파일을 드래그하거나 클릭</p>
+                  <span class="dropzone-hint">WAV, MP3, OGG, M4A, FLAC, WebM</span>
+                </div>
+              </div>
+              <input type="file" id="file-input" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac,.webm" hidden>
+            </div>
+
+            <!-- File Info & Progress -->
+            <div class="file-info-panel" id="file-info-panel" style="display: none;">
+              <div class="file-info-header">
+                <div class="file-info-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/>
+                    <circle cx="18" cy="16" r="3"/>
+                  </svg>
+                </div>
+                <div class="file-info-details">
+                  <span class="file-name" id="upload-file-name">-</span>
+                  <span class="file-meta" id="upload-file-meta">-</span>
+                </div>
+                <button class="btn-icon-sm file-remove-btn" id="file-remove-btn" title="Remove file">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Playback Controls -->
+              <div class="playback-controls" id="playback-controls">
+                <div class="playback-toggle">
+                  <label class="toggle-switch" title="Listen to audio while streaming to STT">
+                    <input type="checkbox" id="playback-enable" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <span class="toggle-label" id="playback-toggle-label">Listen while streaming</span>
+                </div>
+                <div class="playback-volume" id="playback-volume-control">
+                  <svg class="volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                  </svg>
+                  <input type="range" id="playback-volume" min="0" max="100" value="80" title="Playback volume">
+                  <span class="volume-value" id="playback-volume-value">80%</span>
+                </div>
+                <div class="playback-status" id="playback-status">
+                  <span class="playback-indicator"></span>
+                  <span class="playback-status-text">Ready</span>
+                </div>
+              </div>
+
+              <!-- Playback Waveform Visualization -->
+              <div class="playback-waveform-container" id="playback-waveform-container">
+                <canvas id="playback-waveform-canvas" class="playback-waveform-canvas"></canvas>
+                <div class="playback-waveform-overlay" id="playback-waveform-overlay">
+                  <div class="waveform-played" id="waveform-played"></div>
+                  <div class="waveform-cursor" id="waveform-cursor"></div>
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="upload-progress-container">
+                <div class="upload-progress-bar">
+                  <div class="upload-progress-fill" id="upload-progress-fill" style="width: 0%;"></div>
+                  <div class="playback-position-marker" id="playback-position-marker" style="left: 0%;"></div>
+                </div>
+                <div class="upload-progress-info">
+                  <span class="progress-text" id="upload-progress-text">0%</span>
+                  <span class="progress-time" id="upload-progress-time">0:00 / 0:00</span>
+                </div>
+              </div>
+
+              <!-- Upload Controls -->
+              <div class="upload-controls">
+                <div class="speed-control">
+                  <label>Speed:</label>
+                  <select id="upload-speed-select">
+                    <option value="0.5">0.5x (Slow)</option>
+                    <option value="1" selected>1x (Real-time)</option>
+                    <option value="2">2x (Fast)</option>
+                    <option value="4">4x (Faster)</option>
+                    <option value="0">Max (No delay)</option>
+                  </select>
+                </div>
+                <div class="upload-actions">
+                  <button class="btn btn-primary upload-start-btn" id="upload-start-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Start Upload
+                  </button>
+                  <button class="btn btn-secondary upload-cancel-btn" id="upload-cancel-btn" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="6" y="6" width="12" height="12"/>
+                    </svg>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resize Handle between INPUT and OUTPUT -->
+      <div class="io-resize-handle" id="io-resize-handle">
+        <div class="resize-grip"></div>
+      </div>
+
+      <!-- ========================================
+           OUTPUT ZONE - Speaker Output + Real-time LLM
+           ======================================== -->
+      <div class="io-zone output-zone" id="output-zone">
+        <div class="io-zone-header">
+          <div class="io-zone-title">
+            <svg class="io-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <span class="io-label">Output</span>
+            <span class="io-sublabel">Speaker</span>
+          </div>
+          <div class="io-zone-controls">
+            <div class="io-status-badge output-status" id="output-status-badge">
+              <span class="status-dot"></span>
+              <span class="status-label">Idle</span>
+            </div>
+            <button class="btn-icon-sm" id="clear-llm-stream-btn" title="Clear LLM">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="io-zone-body">
+          <!-- Real-time LLM Text (Speaking indicator removed - OUTPUT visualization not available via WebSocket) -->
+          <div class="io-text-section">
+            <div class="io-text-header">
+              <span class="text-section-label">Real-time LLM</span>
+              <div class="tts-sync-indicator" id="tts-sync-indicator">
+                <span class="sync-icon">♪</span>
+                <span class="sync-text">TTS</span>
+              </div>
+            </div>
+            <div class="io-text-content" id="llm-stream-content">
+              <div class="stream-flow" id="llm-stream-flow">
+                <span class="stream-placeholder">AI 응답이 실시간으로 표시됩니다...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legacy elements (hidden, for backward compatibility) -->
+      <div class="realtime-stt-zone secondary-panel" id="realtime-stt-zone" style="display: none;">
+        <div class="realtime-content" id="stt-content">
+          <div class="stt-flow" id="stt-flow"></div>
+          <span class="stt-cursor" id="stt-cursor"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Sidebar: Pipeline, History, Debug, Monitors -->
+    <aside class="sidebar sidebar-right" id="monitors-sidebar">
+      <!-- Resize Handle for Right Sidebar -->
+      <div class="resize-handle resize-handle-horizontal" id="resize-right-sidebar" data-target="monitors-sidebar" data-direction="left"></div>
+
+      <!-- ========================================
+           Premium AI Module Panel (Model Info)
+           ======================================== -->
+      <div class="pipeline-panel" id="model-info-panel">
+        <div class="pipeline-header">
+          <div class="pipeline-title">
+            <svg class="pipeline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 12h8"/>
+              <path d="M12 8v8"/>
+            </svg>
+            <span>AI Module</span>
+          </div>
+          <div class="pipeline-status" id="pipeline-status">
+            <span class="pipeline-status-dot"></span>
+            <span class="pipeline-status-text">Standby</span>
+          </div>
+        </div>
+        <div class="pipeline-flow">
+          <!-- STT Stage -->
+          <div class="pipeline-stage stage-stt" id="pipeline-stt">
+            <div class="stage-icon-wrapper">
+              <svg class="stage-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              </svg>
+            </div>
+            <div class="stage-info">
+              <span class="stage-label">STT</span>
+              <span class="stage-model" id="stt-model-name">-</span>
+              <span class="stage-detail" id="stt-model-params">Waiting for config...</span>
+            </div>
+            <div class="stage-status">
+              <span class="stage-indicator"></span>
+            </div>
+          </div>
+          <!-- Flow Arrow -->
+          <div class="pipeline-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14"/>
+              <path d="M19 12l-7 7-7-7"/>
+            </svg>
+          </div>
+          <!-- LLM Stage -->
+          <div class="pipeline-stage stage-llm" id="pipeline-llm">
+            <div class="stage-icon-wrapper">
+              <svg class="stage-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <div class="stage-info">
+              <span class="stage-label">LLM</span>
+              <span class="stage-model" id="llm-model-name">-</span>
+              <span class="stage-detail" id="llm-model-params">Waiting for config...</span>
+            </div>
+            <div class="stage-status">
+              <span class="stage-indicator"></span>
+            </div>
+          </div>
+          <!-- Flow Arrow -->
+          <div class="pipeline-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14"/>
+              <path d="M19 12l-7 7-7-7"/>
+            </svg>
+          </div>
+          <!-- TTS Stage -->
+          <div class="pipeline-stage stage-tts" id="pipeline-tts">
+            <div class="stage-icon-wrapper">
+              <svg class="stage-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            </div>
+            <div class="stage-info">
+              <span class="stage-label">TTS</span>
+              <span class="stage-model" id="tts-model-name">-</span>
+              <span class="stage-detail" id="tts-model-params">Waiting for config...</span>
+            </div>
+            <div class="stage-status">
+              <span class="stage-indicator"></span>
+            </div>
+          </div>
+        </div>
+        <!-- DIAR Info (Optional) -->
+        <div class="pipeline-extra" id="pipeline-diar-section">
+          <div class="pipeline-extra-item">
+            <svg class="extra-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <div class="extra-info">
+              <span class="extra-label">Diarization</span>
+              <span class="extra-value" id="diar-model-name">-</span>
+              <span class="extra-detail" id="diar-model-params">Waiting for config...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           Conversation History Panel
+           ======================================== -->
+      <div class="sidebar-panel history-panel" id="history-panel">
+        <div class="sidebar-panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>History</span>
+          </div>
+          <div class="panel-actions">
+            <button class="btn-icon-xs" id="clear-history-btn" title="Clear history">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+            <button class="btn-icon-xs panel-collapse-btn" id="history-collapse-btn" title="Toggle panel">
+              <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-panel-content" id="history-content">
+          <div class="history-list" id="history-list">
+            <div class="history-empty">
+              <span class="empty-text">대화 기록이 여기에 표시됩니다</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           Debug Log Panel
+           ======================================== -->
+      <div class="sidebar-panel debug-panel" id="debug-panel">
+        <!-- Resize Handle for Debug Panel -->
+        <div class="panel-resize-handle" id="debug-resize-handle" title="Drag to resize"></div>
+        <div class="sidebar-panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <span>Debug</span>
+          </div>
+          <div class="panel-actions">
+            <label class="toggle-switch-mini">
+              <input type="checkbox" id="auto-scroll-toggle" checked>
+              <span class="toggle-slider-mini"></span>
+            </label>
+            <span class="toggle-label-mini">Auto</span>
+            <button class="btn-icon-xs" id="clear-debug-btn" title="Clear debug log">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+            <button class="btn-icon-xs panel-collapse-btn" id="debug-collapse-btn" title="Toggle panel">
+              <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-panel-content" id="debug-content">
+          <div class="debug-log" id="debug-log">
+            <div class="debug-entry debug-info">
+              <span class="debug-time">--:--:--</span>
+              <span class="debug-msg">Ready for connection...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================
+           Compact Monitors Section
+           ======================================== -->
+      <div class="monitors-section">
+        <!-- VAD + Speaker Combined Monitor -->
+        <div class="monitor-card compact-monitor">
+          <div class="monitor-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <span>VAD</span>
+          </div>
+          <div class="monitor-content vad-monitor-compact">
+            <div class="vad-indicator" id="vad-indicator">
+              <div class="vad-ring"></div>
+              <div class="vad-core"></div>
+            </div>
+            <div class="vad-info">
+              <span class="vad-label" id="vad-label">Silence</span>
+              <span class="vad-timer" id="vad-timer">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Speaker Monitor -->
+        <div class="monitor-card compact-monitor speaker-monitor" id="speaker-panel">
+          <div class="monitor-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Speakers</span>
+            <span class="monitor-badge-sm">4</span>
+          </div>
+          <div class="monitor-content speaker-grid-compact">
+            <div class="speaker-item-compact" id="speaker-0" data-speaker="0">
+              <div class="speaker-dot" style="--speaker-color: #3b82f6;">1</div>
+            </div>
+            <div class="speaker-item-compact" id="speaker-1" data-speaker="1">
+              <div class="speaker-dot" style="--speaker-color: #10b981;">2</div>
+            </div>
+            <div class="speaker-item-compact" id="speaker-2" data-speaker="2">
+              <div class="speaker-dot" style="--speaker-color: #f59e0b;">3</div>
+            </div>
+            <div class="speaker-item-compact" id="speaker-3" data-speaker="3">
+              <div class="speaker-dot" style="--speaker-color: #8b5cf6;">4</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legacy Input Monitor (hidden, for waveform canvas reference) -->
+      <div class="monitor-card" style="display: none;">
+        <div class="monitor-content">
+          <div class="volume-meter">
+            <div class="volume-bar-bg">
+              <div class="volume-bar" id="volume-bar"></div>
+            </div>
+            <span class="volume-value" id="volume-text">0%</span>
+          </div>
+          <div class="waveform-container">
+            <canvas id="waveform-canvas" class="waveform"></canvas>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-info">
+      <span>NVIDIA NeMo Voice Agent</span>
+      <span class="separator">|</span>
+      <span id="footer-stats">Ready</span>
+    </div>
+    <div class="footer-actions">
+      <button class="btn-footer" id="toggle-sidebar-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+        Toggle Settings
+      </button>
+    </div>
+  </footer>
+</div>
+
+<audio id="bot-audio" autoplay></audio>
+
+<script type="module" src="/src/app.ts"></script>
+<link rel="stylesheet" href="/src/style.css">
+</body>
+
+</html>

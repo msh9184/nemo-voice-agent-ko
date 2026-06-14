@@ -1,0 +1,156 @@
+# TTS-Only Mode Configuration
+# =============================================================================
+# Text Input -> TTS -> Audio Output
+# Use case: Text-to-speech service without LLM processing
+#
+# This mode:
+# - Receives text input via RTVI action (text_input:send)
+# - Synthesizes audio directly from input text (no LLM processing)
+# - Returns audio stream
+# - Useful for TTS testing or simple text-to-speech applications
+#
+# Usage:
+#   export SERVER_CONFIG_PATH="./server/server_configs/tts_only_mode.yaml"
+#   python ./server/server.py
+#
+# Service Mode: TTS-ONLY (STT=false, LLM=false, TTS=true)
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 4  # Standard for audio output
+
+# =============================================================================
+# Audio Quality Configuration
+# =============================================================================
+# Controls the trade-off between audio quality and latency/bandwidth
+#
+# quality_mode:
+#   - "high_quality": Preserve TTS native sample rate (44100Hz for Fish Speech)
+#                     Best audio quality, higher bandwidth
+#   - "low_latency": Resample to 16000Hz for smaller frames
+#                    Lower quality but faster transmission
+#
+# output_sample_rate:
+#   - "native": Automatically use TTS model's native rate (recommended)
+#   - 16000: Low quality, low bandwidth
+#   - 24000: Medium quality
+#   - 44100: High quality (CD quality)
+#   - 48000: Professional quality
+# =============================================================================
+audio:
+  quality_mode: "high_quality"
+  output_sample_rate: "native"  # Use TTS native rate (44100Hz for Fish Speech)
+
+
+# =============================================================================
+# STT Configuration (DISABLED for text input mode)
+# =============================================================================
+stt:
+  enabled: false
+  # Placeholder values (not loaded when enabled=false)
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+
+# VAD not needed for text input
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.0
+  min_volume: 0.4
+
+# Diarization not meaningful without voice input
+diar:
+  enabled: false
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+  threshold: 0.5
+  frame_len_in_secs: 0.08
+
+# =============================================================================
+# LLM Configuration (DISABLED - direct text to TTS)
+# =============================================================================
+llm:
+  enabled: false
+  # Placeholder values (not loaded when enabled=false)
+  type: hf
+  model: "placeholder"
+  device: "cpu"
+
+# =============================================================================
+# TTS Configuration (ENABLED - OpenAudio S1-mini via HTTP API)
+# =============================================================================
+# RECOMMENDED: Use API mode for low-latency real-time streaming.
+#
+# The Fish Speech API server must be running BEFORE starting Voice Agent.
+# See prerequisites above.
+#
+# Voice Cloning Workflow:
+#   1. Set reference_audio_path and reference_audio_text below
+#   2. On server startup, the reference audio is automatically registered
+#      with the Fish Speech API via /v1/references/add
+#   3. A unique reference_id is generated based on file content hash
+#   4. All TTS requests use this reference_id for consistent voice
+#   5. reference_id is cached, so restarts with same audio reuse the ID
+#
+# Service Mode Control:
+#   - enabled: true  -> TTS synthesis active (default)
+#   - enabled: false -> TTS disabled, text-only output
+#   Note: If llm.enabled=true and tts.enabled=false, this creates STT+LLM mode
+#         (voice input, text output chatbot)
+# =============================================================================
+tts:
+  enabled: true  # Set to false for text-only output mode
+  type: fish_speech_api
+
+  # Fish Speech API server URL
+  # Default: http://localhost:8080
+  api_url: "http://localhost:8080"
+
+  # Device is handled by API server (not used here)
+  device: "cuda:0"
+
+  # Voice cloning settings
+  # -----------------------------------------------------------------------------
+  # For consistent voice, provide a 10-30 second Korean reference audio.
+  # The reference audio will be automatically registered on server startup.
+  # -----------------------------------------------------------------------------
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+  # reference_audio_path: "/path/to/reference_voice.wav"
+  # reference_audio_text: "<exact transcript of your reference audio>"
+  reference_audio_path: "/path/to/reference_voice.wav"
+  reference_audio_text: "<exact transcript of your reference audio>"
+
+  # Optional: Pre-registered reference ID
+  # If you already registered a reference via Fish Speech API, set its ID here.
+  # This skips auto-registration and uses the existing reference directly.
+  reference_id: null  # e.g., "voice_agent_korean_voice_abc123"
+
+  # Memory caching for faster inference
+  # "on": Enable VQ token caching (faster, uses more GPU memory)
+  # "off": Disable caching (slower, uses less GPU memory)
+  use_memory_cache: "on"
+
+  # API request timeout (seconds)
+  timeout: 60
+
+  # Text segmentation for streaming TTS
+  # Includes Korean punctuation marks for proper sentence boundaries
+  extra_separator:
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+    - "。"   # Korean/Japanese full stop
+    - "？"   # Korean/Japanese question mark
+    - "！"   # Korean/Japanese exclamation mark
+    # - ','
+    # - ";"
+    # - ":"
+    # - "、"   # Korean/Japanese comma
+
+  # Think tokens (null for no filtering)
+  think_tokens: null

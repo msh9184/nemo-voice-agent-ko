@@ -1,0 +1,42 @@
+# MeloTTS Korean TTS Configuration
+# High-quality Korean text-to-speech using MeloTTS
+# More info: https://huggingface.co/myshell-ai/MeloTTS-Korean
+#
+# Installation: pip install melotts
+#
+# Features:
+#   - Native Korean text support (no romanization needed)
+#   - CPU real-time inference capable
+#   - VITS-based architecture for high quality
+#   - MIT license (commercial use allowed)
+
+main_model_id: "myshell-ai/MeloTTS-Korean"
+sub_model_id: null  # Not needed for MeloTTS
+
+# Device configuration
+# MeloTTS is optimized for CPU real-time inference
+# Use "cpu" for lower GPU memory usage, or "cuda" for potentially faster synthesis
+device: "cpu"
+
+# Audio settings
+sample_rate: 44100  # MeloTTS native sample rate
+
+# Speaking rate (1.0 = normal, >1.0 = faster, <1.0 = slower)
+speed: 1.0
+
+# Text segmentation for streaming TTS
+# These punctuation marks will be used to chunk LLM responses for faster TTS output
+extra_separator:
+  - ','
+  - '\n'
+  - "."
+  - "?"
+  - "!"
+  - ";"
+  - ":"
+  - "、"  # Korean comma
+  - "。"  # Korean period (rarely used but included for compatibility)
+
+# Think tokens - set to null to allow thinking out loud
+# Or specify tokens to filter out thinking process from TTS
+think_tokens: ["<think>", "</think>"]

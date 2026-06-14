@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Node / web client
+node_modules/
+examples/voice_agent/client/dist/
+*.tar
+
+# Env / secrets
+.env
+.env.local
+*.pem
+
+# Models / data / audio (do not commit large or private assets)
+*.nemo
+*.ckpt
+*.wav
+*.mp3
+*.flac
+
+# OS / editor
+.DS_Store
+*.swp

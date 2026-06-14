@@ -1,0 +1,11 @@
+# constraints.txt
+# PyTorch 버전 고정을 위한 제약 조건 파일
+# 사용법: pip install -r requirements_251204.txt -c constraints.txt
+
+# PyTorch 2.6.x 고정
+torch>=2.6.0,<2.7.0
+torchvision>=0.21.0,<0.22.0
+torchaudio>=2.6.0,<2.7.0
+
+# transformer_engine 호환성
+transformer_engine>=1.14.0,<2.0.0

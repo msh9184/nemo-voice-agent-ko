@@ -1,0 +1,74 @@
+# CosyVoice3 Korean TTS Configuration
+# High-quality Korean text-to-speech using Fun-CosyVoice3-0.5B
+# More info: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+#
+# Installation:
+#   git clone https://github.com/FunAudioLLM/CosyVoice.git
+#   cd CosyVoice && pip install -e .
+#   # Download model from HuggingFace
+#
+# Features:
+#   - 9 languages: Chinese, English, Japanese, Korean, German, Spanish, French, Italian, Russian
+#   - Zero-shot voice cloning (3-10s reference audio)
+#   - Cross-lingual synthesis with <|ko|> language tag
+#   - Streaming support with 150ms latency
+#   - 68.7% relative improvement for Korean vs previous versions
+#   - 0.5B parameters, Apache 2.0 license
+#
+# Model files (~7.45GB total):
+#   - llm.pt (2.02GB) - Language model component
+#   - flow.pt (1.33GB) - Flow matching decoder
+#   - hift.pt (83.2MB) - HiFi-GAN vocoder
+#   - speech_tokenizer_v2.onnx (1.6GB)
+#   - campplus.onnx (27.7MB)
+#   - spk2info.pt (2.4GB)
+
+type: cosyvoice3
+
+# Model path - absolute path to the downloaded model directory
+# Download from: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+main_model_id: "/path/to/model"
+sub_model_id: null  # Not needed for CosyVoice3
+
+# Device configuration
+# CosyVoice3 requires GPU for efficient inference
+# Recommended: CUDA with >= 8GB VRAM
+device: "cuda"
+
+# Audio settings
+sample_rate: 22050  # CosyVoice3 native sample rate
+
+# Voice cloning settings
+# Provide a reference audio file (3-10 seconds of clear speech) for zero-shot voice cloning
+# Set to null to use default voice
+reference_audio_path: null
+
+# Use instruct mode for more controllable synthesis
+# When true, you can add instructions like emotion, speed, style in the prompt
+# Example: "<|happy|> 안녕하세요!" or "Speak slowly: 반갑습니다"
+use_instruct: false
+
+# Enable streaming for lower latency
+# When true, audio is generated and yielded in chunks for faster first audio
+# Latency: ~150ms with streaming enabled
+streaming: true
+
+# Speaking rate (1.0 = normal, >1.0 = faster, <1.0 = slower)
+speed: 1.0
+
+# Text segmentation for streaming TTS
+# These punctuation marks will be used to chunk LLM responses for faster TTS output
+extra_separator:
+  - ','
+  - '\n'
+  - "."
+  - "?"
+  - "!"
+  - ";"
+  - ":"
+  - ","  # Korean comma (U+FF0C)
+  - "."  # Korean period (U+3002)
+
+# Think tokens - set to null to allow thinking out loud
+# Or specify tokens to filter out thinking process from TTS
+think_tokens: ["<think>", "</think>"]

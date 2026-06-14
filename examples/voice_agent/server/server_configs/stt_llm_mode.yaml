@@ -1,0 +1,96 @@
+# STT+LLM Mode Configuration (Voice Input, Text Output Chatbot)
+# =============================================================================
+# This config enables ASR + LLM without TTS components.
+# Use this for a voice input chatbot that responds with text.
+#
+# Usage:
+#   export SERVER_CONFIG_PATH="./server/server_configs/stt_llm_mode.yaml"
+#   python ./server/server.py
+#
+# Service Mode: STT+LLM (LLM=true, TTS=false)
+# - User speaks -> STT transcribes -> LLM generates response -> Text output
+# - No audio output, only text responses
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 4  # minimal since we don't need TTS audio output
+
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 0.6
+  min_volume: 0.4
+
+# Speech-to-Text Configuration
+stt:
+  type: nemo
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+  filter_display_tokens:
+    - "<lan_unk>"
+    - "<lan_de>"
+    - "<lan_en>"
+    - "<lan_es>"
+    - "<lan_fr>"
+    - "<lan_hi>"
+    - "<lan_it>"
+    - "<lan_ja>"
+    - "<lan_ko>"
+    - "<lan_pl>"
+    - "<lan_pt>"
+    - "<lan_th>"
+    - "<lan_vi>"
+    - "<lan_zh>"
+  preserve_raw_for_llm: true
+  extract_language_info: true
+
+# Speaker Diarization (disabled for simplicity)
+diar:
+  type: nemo
+  enabled: false
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4
+  frame_len_in_secs: 0.08
+
+# Turn Taking Configuration
+turn_taking:
+  backchannel_phrases_path: "./server/backchannel_phrases.yaml"
+  max_buffer_size: 2
+  bot_stop_delay: 0.1
+
+# =============================================================================
+# LLM Configuration (ENABLED for STT+LLM mode)
+# =============================================================================
+llm:
+  enabled: true  # Enable LLM for chatbot functionality
+  type: hf
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  enable_reasoning: false
+
+  system_prompt: |
+    [정체성]
+    당신은 음성으로 대화하는 AI 텍스트 어시스턴트입니다.
+    사용자의 음성 입력을 텍스트로 받아 텍스트로 응답합니다.
+
+    [스타일]
+    - 전문적이면서도 친근하게 대화하세요
+    - 응답은 간결하고 명확하게 작성하세요
+    - 음성 출력이 없으므로 특수 기호나 이모지를 적절히 활용해도 됩니다
+
+    [응답 지침]
+    - 최대 500자 이내로 응답
+    - 필요시 확인 질문
+    - 정보는 이해하기 쉽게 구조화
+
+# =============================================================================
+# TTS Configuration (DISABLED for STT+LLM mode)
+# =============================================================================
+tts:
+  enabled: false  # Disable TTS for text-only output
+  type: kokoro
+  device: "cuda:0"

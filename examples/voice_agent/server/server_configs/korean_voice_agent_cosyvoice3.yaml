@@ -1,0 +1,114 @@
+# Korean Voice Agent Configuration with CosyVoice3 TTS
+# Full STT-LLM-TTS Pipeline for Korean language
+#
+# Components:
+#   - STT: NeMo Fast-Conformer (Korean)
+#   - LLM: Korean LLM (any Hugging Face causal LM)
+#   - TTS: CosyVoice3 (Fun-CosyVoice3-0.5B) - High quality Korean TTS
+#
+# CosyVoice3 Features:
+#   - 9 languages including Korean with <|ko|> tag
+#   - Zero-shot voice cloning (3-10s reference audio)
+#   - Streaming with 150ms latency
+#   - 68.7% improvement for Korean vs previous versions
+#   - Apache 2.0 license
+#
+# Usage:
+#   SERVER_CONFIG_PATH=./server_configs/korean_voice_agent_cosyvoice3.yaml python server.py
+#
+# Note: Ensure model paths are accessible on your GPU server
+
+transport:
+  audio_out_10ms_chunks: 10  # Increase for smoother TTS output
+
+# Voice Activity Detection
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.2  # Slightly longer pause tolerance for Korean speech
+  min_volume: 0.4
+
+# Speech-to-Text Configuration (Korean Fast-Conformer)
+stt:
+  type: nemo
+  # Update this path to your actual Korean STT model location
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+
+# Speaker Diarization (optional - can be disabled for lower latency)
+diar:
+  type: nemo
+  enabled: false  # Disable for lower latency in single-speaker scenarios
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4
+  frame_len_in_secs: 0.08
+
+# Turn Taking Configuration
+turn_taking:
+  backchannel_phrases_path: null  # Disable backchannel for simpler behavior
+  max_buffer_size: 3  # Korean words tend to be shorter
+  bot_stop_delay: 0.5
+
+# Large Language Model Configuration (Korean LLM (any Hugging Face causal LM))
+llm:
+  type: hf  # HuggingFace backend for safetensors support
+  # Update this path to your actual LLM location
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  enable_reasoning: false  # Disable for lowest latency
+
+  # Korean system prompt
+  system_prompt: |
+    당신은 친절하고 도움이 되는 한국어 AI 어시스턴트 '리사'입니다.
+    먼저 사용자에게 따뜻하게 인사하고 한 문장으로 자신을 소개하세요.
+    답변은 간결하고 핵심적으로 해주세요.
+    이모지는 사용하지 마세요.
+    자연스러운 한국어로 대화해 주세요.
+
+# Text-to-Speech Configuration (CosyVoice3 Korean)
+# CRITICAL: For proper Korean TTS, you MUST provide BOTH:
+#   1. reference_audio_path - Korean speech audio (3-10 seconds, will be resampled to 16kHz)
+#   2. reference_audio_text - The EXACT transcript of what the reference audio says
+# The text_frontend is automatically disabled for Korean (it only supports Chinese/English)
+tts:
+  type: cosyvoice3
+  # Update this path to your CosyVoice3 model location
+  # Download from: https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+  model: "/path/to/model"
+  model_config: "./server_configs/tts_configs/cosyvoice3_korean.yaml"
+  device: "cuda:0"  # CosyVoice3 requires GPU
+
+  # Voice cloning settings (REQUIRED for Korean TTS!)
+  # Provide path to a 3-10 second Korean reference audio for voice cloning
+  reference_audio_path: null  # e.g., "/path/to/korean_voice_sample.wav"
+
+  # CRITICAL: The EXACT transcript of what the reference audio says
+  # This must match the audio content perfectly for proper voice cloning
+  # Example: "안녕하세요, 저는 당신의 인공지능 비서입니다."
+  reference_audio_text: null
+
+  # Enable instruct mode for controllable synthesis
+  use_instruct: false
+
+  # Enable streaming for lower latency (~150ms)
+  streaming: true
+
+  # Speaking rate
+  speed: 1.0
+
+  # Text segmentation for streaming TTS
+  extra_separator:
+    - ','
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+    - ";"
+    - ":"
+
+  # Think tokens (null for no filtering)
+  think_tokens: null

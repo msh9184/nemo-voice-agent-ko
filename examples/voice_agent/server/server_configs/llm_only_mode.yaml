@@ -1,0 +1,102 @@
+# LLM-Only Mode Configuration
+# =============================================================================
+# Text Input -> LLM -> Text Output
+# Use case: Pure text chatbot without voice capabilities
+#
+# This mode:
+# - Receives text input via RTVI action (text_input:send)
+# - Processes through LLM for response generation
+# - Returns text response (no audio)
+# - No microphone or speaker required
+#
+# Usage:
+#   export SERVER_CONFIG_PATH="./server/server_configs/llm_only_mode.yaml"
+#   python ./server/server.py
+#
+# Service Mode: LLM-ONLY (STT=false, LLM=true, TTS=false)
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 1  # Minimal since we don't need TTS audio output
+
+# =============================================================================
+# STT Configuration (DISABLED for text input mode)
+# =============================================================================
+stt:
+  enabled: false
+  # Placeholder values (not loaded when enabled=false)
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+
+# VAD not needed for text input (Enter key = end of utterance)
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.0
+  min_volume: 0.4
+
+# Diarization not meaningful without voice input
+diar:
+  enabled: false
+  type: nemo
+  model: "placeholder"
+  device: "cpu"
+  threshold: 0.5
+  frame_len_in_secs: 0.08
+
+# =============================================================================
+# LLM Configuration (ENABLED)
+# =============================================================================
+llm:
+  enabled: true  # Enable LLM for chatbot functionality
+  type: hf
+  # ============================================================================
+  # MODEL OPTIONS:
+  # ============================================================================
+  # Option 1: HuggingFace Model (requires network access)
+  # model: "nvidia/NVIDIA-Nemotron-Nano-9B-v2"        # Recommended, 21GB VRAM
+  # model: "Qwen/Qwen2.5-7B-Instruct"                 # Alternative, ~16GB VRAM
+  # model: "meta-llama/Llama-3.1-8B-Instruct"         # Alternative, ~17GB VRAM
+  #
+  # Option 2: Local path (for offline/network-restricted environments)
+  # model: "/path/to/your/local/model"
+  # ============================================================================
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  max_tokens: 512
+  temperature: 0.7
+  enable_reasoning: false
+
+  system_prompt: |
+    [정체성]
+    당신은 음성으로 대화하는 AI 텍스트 어시스턴트입니다.
+    사용자의 음성 입력을 텍스트로 받아 텍스트로 응답합니다.
+
+    [스타일]
+    - 전문적이면서도 친근하게 대화하세요
+    - 응답은 간결하고 명확하게 작성하세요
+    - 음성 출력이 없으므로 특수 기호나 이모지를 적절히 활용해도 됩니다
+
+    [응답 지침]
+    - 최대 500자 이내로 응답
+    - 필요시 확인 질문
+    - 정보는 이해하기 쉽게 구조화
+
+
+# =============================================================================
+# TTS Configuration (DISABLED for text-only output)
+# =============================================================================
+tts:
+  enabled: false
+  # Placeholder values (not loaded when enabled=false)
+  type: null
+  device: "cpu"
+
+# Turn-taking not needed (user presses Enter to send)
+turn_taking:
+  backchannel_phrases_path: null
+  max_buffer_size: 10
+  bot_stop_delay: 0.1

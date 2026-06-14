@@ -1,0 +1,78 @@
+# Korean Voice Agent Configuration
+# Full STT-LLM-TTS Pipeline for Korean language
+#
+# Components:
+#   - STT: NeMo Fast-Conformer (Korean)
+#   - LLM: Korean LLM (any Hugging Face causal LM)
+#   - TTS: MeloTTS Korean
+#
+# Usage:
+#   SERVER_CONFIG_PATH=./server_configs/korean_voice_agent.yaml python server.py
+#
+# Note: Ensure model paths are accessible on your GPU server
+
+transport:
+  audio_out_10ms_chunks: 10  # Increase for smoother TTS output
+
+# Voice Activity Detection
+vad:
+  type: silero
+  confidence: 0.6
+  start_secs: 0.1
+  stop_secs: 1.2  # Slightly longer pause tolerance for Korean speech
+  min_volume: 0.4
+
+# Speech-to-Text Configuration (Korean Fast-Conformer)
+stt:
+  type: nemo
+  # Update this path to your actual Korean STT model location
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+
+# Speaker Diarization (optional - can be disabled for lower latency)
+diar:
+  type: nemo
+  enabled: false  # Disable for lower latency in single-speaker scenarios
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4
+  frame_len_in_secs: 0.08
+
+# Turn Taking Configuration
+turn_taking:
+  backchannel_phrases_path: null  # Disable backchannel for simpler behavior
+  max_buffer_size: 3  # Korean words tend to be shorter
+  bot_stop_delay: 0.5
+
+# Large Language Model Configuration (Korean LLM (any Hugging Face causal LM))
+llm:
+  type: hf  # HuggingFace backend for safetensors support
+  # Update this path to your actual LLM location
+  model: "/path/to/model"
+  model_config: "./server_configs/llm_configs/hf_llm_generic.yaml"
+  device: "cuda:0"
+  enable_reasoning: false  # Disable for lowest latency
+
+  # Korean system prompt
+  system_prompt: |
+    당신은 친절하고 도움이 되는 한국어 AI 어시스턴트 '리사'입니다.
+    먼저 사용자에게 따뜻하게 인사하고 한 문장으로 자신을 소개하세요.
+    답변은 간결하고 핵심적으로 해주세요.
+    이모지는 사용하지 마세요.
+    자연스러운 한국어로 대화해 주세요.
+
+# Text-to-Speech Configuration (MeloTTS Korean)
+tts:
+  type: melo_korean
+  model: "myshell-ai/MeloTTS-Korean"
+  model_config: "./server_configs/tts_configs/melo_korean.yaml"
+  device: "cpu"  # MeloTTS is CPU real-time capable
+  speed: 1.0
+  extra_separator:
+    - ','
+    - '\n'
+    - "."
+    - "?"
+    - "!"
+  think_tokens: null  # No thinking tokens

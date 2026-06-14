@@ -1,0 +1,183 @@
+# STT-Only Server Configuration
+# =============================================================================
+# This config enables ASR-only serving without LLM and TTS components.
+# Use this for standalone speech recognition service.
+#
+# Works with both:
+#   - Unified server: python ./server/server.py (recommended)
+#   - Legacy server: python ./server/stt_only_server.py
+#
+# Usage (Unified Server):
+#   export SERVER_CONFIG_PATH="./server/server_configs/stt_only.yaml"
+#   python ./server/server.py
+#
+# Service Mode: STT-ONLY (LLM=false, TTS=false)
+# =============================================================================
+
+transport:
+  audio_out_10ms_chunks: 4  # minimal since we don't need TTS audio output
+
+vad:
+  type: silero
+  confidence: 0.1    # 극도로 낮은 임계값 설정 => 거의 항상 발화 감
+  start_secs: 0.05   # 즉시 시작
+  stop_secs: 10.0    # 높음 발화 종료 설정 => 사실상 비활성화
+  min_volume: 0.005  # 매우 낮은 볼륨도 허용
+
+stt:
+  type: nemo
+  # ============================================================================
+  # MODEL OPTIONS:
+  # ============================================================================
+  #
+  # Option 1: HuggingFace Model (requires network access)
+  # model: "nvidia/parakeet_realtime_eou_120m-v1"        # EOU detection, 120M params
+  # model: "nvidia/stt_en_fastconformer_hybrid_large_streaming_multi"  # Recommended
+  #
+  # Option 2: Local .nemo checkpoint (recommended for offline/network-restricted environments)
+  # model: "/path/to/workspace"
+  # model: "/path/to/your/custom_asr_model.nemo"
+  #
+  # Note: To convert HuggingFace model to .nemo for offline use:
+  #   from nemo.collections.asr.models import ASRModel
+  #   model = ASRModel.from_pretrained("nvidia/stt_en_fastconformer_hybrid_large_streaming_multi")
+  #   model.save_to("/path/to/save/model.nemo")
+  # ============================================================================
+  # model: "/path/to/model/asr_model.nemo" 
+  model: "/path/to/model/asr_model.nemo"
+  model_config: "./server_configs/stt_configs/nemo_cache_aware_streaming.yaml"
+  device: "cuda:0"
+  # Frame length for streaming (80ms is the model's designed value - DO NOT CHANGE)
+  # Changing this causes tensor size mismatch with the model's cache-aware streaming
+  frame_len_in_secs: 0.08
+  # Attention context size for streaming
+  att_context_size: [70, 1]
+
+  # ============================================================================
+  # STT-ONLY MODE STABILITY SETTINGS
+  # ============================================================================
+  # These settings prevent OOM (Out of Memory) issues during long continuous audio
+  # streaming by periodically resetting accumulated tokens while preserving
+  # encoder cache for recognition accuracy.
+  #
+  # min_words_for_soft_reset: Minimum word count before punctuation-based soft reset
+  # max_words_for_soft_reset: Maximum words before soft reset for OOM prevention
+  #
+  # IMPORTANT: Only PUNCTUATION triggers FINAL (TranscriptionFrame).
+  # max_words triggers soft reset ONLY (prevents OOM) without sending FINAL.
+  # This is because the stateful RNNT decoder continues accumulating text
+  # from encoder cache after reset (20→21→22→...), which would cause
+  # cascading FINAL triggers if max_words also triggered FINAL.
+  #
+  # Soft reset behavior:
+  #   - Clears accumulated tokens but preserves encoder cache
+  #   - Prevents unbounded token accumulation in long streaming sessions
+  #   - Rate-limited (triggers again only after 10 more words to prevent cascade)
+  #
+  # Boundary behavior:
+  #   1. Punctuation detected: Send TranscriptionFrame (FINAL), soft reset
+  #   2. max_words reached: Soft reset only, send InterimTranscriptionFrame
+  #   3. VAD stop: Full reset (clears encoder cache too), send FINAL
+  # ============================================================================
+  min_words_for_soft_reset: 3
+  max_words_for_soft_reset: 20
+
+# Text aggregator for buffer management and sentence boundary detection
+# This manages how streaming transcription text is accumulated and when to finalize
+aggregator:
+  # Use VAD stop signal as utterance boundary (recommended: true)
+  # When user stops speaking (detected by VAD), finalize the current utterance
+  use_vad_boundary: true
+
+  # Use punctuation as sentence boundary (optional: true for natural sentence breaks)
+  # Detects ., ?, ! etc. as sentence end
+  use_punctuation_boundary: true
+
+  # Minimum words before punctuation triggers a boundary
+  # Prevents false positives from abbreviations like "Dr." or "Mr."
+  min_words_for_punctuation_boundary: 3
+
+  # Maximum words threshold (legacy, kept for reference)
+  # NOTE: max_words NO LONGER triggers FINAL/commit in aggregator.
+  # Only punctuation and VAD trigger FINAL now.
+  # STT layer handles OOM prevention via rate-limited soft reset.
+  max_words_before_commit: 20
+
+  # Sentence-ending punctuation characters (for multiple languages)
+  sentence_end_punctuation: ".?!。？！"
+
+  # ============================================================================
+  # SILENCE TIMEOUT (NEW)
+  # ============================================================================
+  # Automatically flush buffer after N seconds of silence
+  # Useful for handling long pauses or when VAD doesn't trigger
+  # Set to 0 to disable timeout-based flushing
+  silence_timeout_secs: 3.0
+
+  # How often to check for silence timeout (in seconds)
+  silence_check_interval_secs: 0.5
+
+# Diarization (optional - can be disabled for simpler STT-only mode)
+diar:
+  type: nemo
+  enabled: false  # Speaker diarization enabled
+  # ============================================================================
+  # DIARIZATION MODEL OPTIONS:
+  # ============================================================================
+  # HuggingFace: "nvidia/diar_streaming_sortformer_4spk-v2"
+  # Local .nemo: "/path/to/your/diarization_model.nemo"
+  # ============================================================================
+  model: "nvidia/diar_streaming_sortformer_4spk-v2"
+  device: "cuda:0"
+  threshold: 0.4  # Speaker detection threshold
+  frame_len_in_secs: 0.08
+
+# ============================================================================
+# SPEAKER-AWARE AGGREGATOR (used when diar.enabled is true)
+# ============================================================================
+# When diarization is enabled, the SpeakerAwareAggregator replaces STTTextAggregator
+# This provides additional features:
+# - Speaker change detection triggers automatic line breaks
+# - Color-coded console output per speaker
+# - Speaker status frames for frontend UI
+# ============================================================================
+speaker_aggregator:
+  # Maximum number of speakers to track (model supports up to 4)
+  max_speakers: 4
+
+  # Use speaker change as a commit boundary
+  # When a different speaker is detected, finalize current speaker's utterance
+  use_speaker_boundary: true
+
+  # Minimum words before speaker change triggers a commit
+  # Prevents very short fragments when speakers overlap briefly
+  min_words_for_speaker_commit: 1
+
+  # Enable colored console display for speaker transcriptions
+  # Shows speaker identification with ANSI colors in terminal
+  console_display: true
+
+# =============================================================================
+# LLM and TTS Configuration (DISABLED for STT-only mode)
+# =============================================================================
+# These sections are required for the unified bot_websocket_server.py
+# Setting enabled: false skips initialization of these components
+
+llm:
+  enabled: false  # Disable LLM for STT-only mode
+  # Placeholder values (not loaded when enabled=false)
+  type: hf
+  model: "placeholder"
+  device: "cuda:0"
+
+tts:
+  enabled: false  # Disable TTS for STT-only mode
+  # Placeholder values (not loaded when enabled=false)
+  type: kokoro
+  device: "cuda:0"
+
+# Turn-taking configuration (not used in STT-only mode but required for config loading)
+turn_taking:
+  backchannel_phrases_path: null
+  max_buffer_size: 2
+  bot_stop_delay: 0.1
