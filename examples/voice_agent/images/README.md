@@ -1,43 +1,17 @@
 # Voice Agent Images
 
-Documentation images for the Voice Agent README.
+Optional documentation/UI assets for the Voice Agent.
 
-## Required Images
+This directory is intentionally empty by default. If you want a branded web client
+or screenshots in the docs, add your own image files here:
 
-Place the following image files in this directory:
+- `logo_white.png` — logo shown on the dark theme of the web client
+- `logo_black.png` — logo shown on the light theme of the web client
 
-| Filename | Description | Used In |
-|----------|-------------|---------|
-| `stt_only_audio_file_upload.png` | STT-Only mode audio file upload screenshot | README.md, examples/voice_agent/README.md |
-| `logo_white.png` | Logo (white, for dark theme) | Web client |
-| `logo_black.png` | Logo (black, for light theme) | Web client |
+Then copy the logos into the client's public assets:
 
-## Screenshot Guidelines
-
-For `stt_only_audio_file_upload.png`:
-- Capture the STT-Only mode with a file uploaded
-- Show the waveform visualization
-- Include the conversation area with transcription results
-- Recommended width: 800-1200px
-- Use PNG format for best quality
-
-## Logo Files
-
-Copy logo files from GPU server:
 ```bash
-# If logos are on GPU server
-cp /path/to/logo_*.png ./
-
-# Copy to web client public directory
 cp logo_*.png ../client/public/images/
 ```
 
-## File Structure
-
-```
-examples/voice_agent/images/
-├── README.md                           # This file
-├── stt_only_audio_file_upload.png      # Screenshot for README
-├── logo_white.png               # Logo for dark theme
-└── logo_black.png               # Logo for light theme
-```
+Use your own neutral/personal artwork; no logos are shipped with this repository.

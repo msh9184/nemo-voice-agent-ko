@@ -10,8 +10,15 @@ A real-time, full-duplex **Korean voice agent** built on [NVIDIA NeMo](https://g
 
 Audio flows through the pipeline incrementally, so the user hears partial results at conversational latency:
 
-```
-audio -> streaming ASR -> (streaming diarization -> speaker-aware aggregation) -> turn-taking -> LLM -> TTS -> audio
+```mermaid
+flowchart LR
+    A["Audio in"] --> ASR["Streaming ASR"]
+    ASR --> DIAR["Streaming diarization"]
+    DIAR --> AGG["Speaker-aware aggregation"]
+    AGG --> TT["Turn-taking"]
+    TT --> LLM["LLM"]
+    LLM --> TTS["TTS"]
+    TTS --> OUT["Audio out"]
 ```
 
 The system runs as a FastAPI WebSocket server plus a TypeScript/Vite web client, and supports six independently selectable modes (from STT-only to full duplex).
@@ -42,31 +49,16 @@ The system runs as a FastAPI WebSocket server plus a TypeScript/Vite web client,
 
 ## Architecture
 
-```
-+--------------------------------------------------------------------------+
-|                      Real-Time Voice Agent Pipeline                      |
-+--------------------------------------------------------------------------+
-|  Mic / audio (16 kHz)                                                     |
-|        |   WebSocket (pipecat transport)                                  |
-|        v                                                                  |
-|  +--------------+   +---------------------+                               |
-|  | Streaming ASR|-->| Streaming Diar      |  (Sortformer, <=4 speakers)   |
-|  | (Conformer/  |   | + Speaker-Aware     |                               |
-|  |  RNNT, cache)|   |   Aggregator        |                               |
-|  +--------------+   +----------+----------+                               |
-|        | partial/final text              | speaker-attributed text       |
-|        +--------------+------------------+                                |
-|                       v                                                   |
-|                 +-----------+   turn-taking / endpointing                 |
-|                 |    LLM    |   (HF causal LM or vLLM)                     |
-|                 +-----+-----+                                             |
-|                       v                                                   |
-|                 +-----------+                                             |
-|                 |    TTS    |   (Kokoro / MeloTTS-KO / CosyVoice3 / Fish) |
-|                 +-----+-----+                                             |
-|                       v                                                   |
-|             streamed audio + transcript --> Web client (RTVI)            |
-+--------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    MIC["Mic / audio (16 kHz)"] -->|"WebSocket - pipecat transport"| ASR["Streaming ASR<br/>(Conformer / RNNT, cache-aware)"]
+    ASR --> DIAR["Streaming diarization<br/>(Sortformer, up to 4 speakers)"]
+    DIAR --> AGG["Speaker-aware aggregation"]
+    ASR --> TT["Turn-taking / endpointing"]
+    AGG --> TT
+    TT --> LLM["LLM<br/>(HF causal LM or vLLM)"]
+    LLM --> TTS["TTS<br/>(Kokoro / MeloTTS-KO / CosyVoice3 / Fish-Speech)"]
+    TTS --> WC["Web client<br/>(streamed audio + transcript, RTVI)"]
 ```
 
 ## Repository layout

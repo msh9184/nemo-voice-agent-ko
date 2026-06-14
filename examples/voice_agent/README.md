@@ -101,55 +101,41 @@ The NeMo Voice Agent implements a full-duplex conversational AI system with stre
 
 ### High-Level Architecture
 
-```
-                          ┌───────────────────────────────────────────────────────────┐
-                          │                    VOICE AGENT SERVER                      │
-                          │                                                           │
-┌─────────────┐          │  ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐ │
-│             │  Audio   │  │       │   │       │   │       │   │       │   │       │ │
-│  Web Client │ ───────▶ │  │  VAD  │──▶│  STT  │──▶│ Turn  │──▶│  LLM  │──▶│  TTS  │ │
-│  (Browser)  │          │  │Silero │   │ NeMo  │   │Taking │   │ vLLM  │   │OpenAudio│
-│             │ ◀─────── │  │       │   │       │   │       │   │       │   │       │ │
-└─────────────┘  Audio   │  └───────┘   └───┬───┘   └───────┘   └───────┘   └───────┘ │
-                          │                 │                                         │
-       ▲                  │            ┌────▼────┐                                    │
-       │                  │            │  Diar   │                                    │
-       │                  │            │SortFormer                                    │
-  WebSocket              │            └─────────┘                                    │
-  Transport               │                                                           │
-  (Protobuf)              └───────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    WC["Web Client (Browser)"]
+    subgraph SRV["Voice Agent Server"]
+      direction LR
+      VAD["VAD (Silero)"] --> STT["STT (NeMo)"]
+      STT --> TT["Turn-taking"]
+      TT --> LLM["LLM (vLLM)"]
+      LLM --> TTS["TTS (OpenAudio)"]
+      STT --> DIAR["Diarization (Sortformer)"]
+    end
+    WC -->|"audio in"| VAD
+    TTS -->|"audio out"| WC
 ```
 
 ### Frame-Based Pipeline
 
 The pipeline uses a **frame-based architecture** where each component processes and emits frames:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              FRAME FLOW DIAGRAM                                      │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                     │
-│  AudioRawFrame ──▶ VADUserStartedSpeakingFrame ──▶ InterimTranscriptionFrame        │
-│       │                      │                              │                       │
-│       ▼                      ▼                              ▼                       │
-│  [VAD Process]      [STT Streaming]              [Turn-Taking Decision]             │
-│       │                      │                              │                       │
-│       ▼                      ▼                              ▼                       │
-│  VADUserStoppedSpeakingFrame ──▶ TranscriptionFrame ──▶ UserStartedSpeakingFrame    │
-│                                       │                         │                   │
-│                                       ▼                         ▼                   │
-│                              [LLM Context Update]      [LLM Response Generation]    │
-│                                                                 │                   │
-│                                                                 ▼                   │
-│                                                        LLMFullResponseEndFrame      │
-│                                                                 │                   │
-│                                                                 ▼                   │
-│                                              TextFrame ──▶ TTSAudioRawFrame         │
-│                                                                 │                   │
-│                                                                 ▼                   │
-│                                                        BotStoppedSpeakingFrame      │
-│                                                                                     │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["AudioRawFrame"] --> VAD["VAD process"]
+    VAD --> VS["VADUserStartedSpeakingFrame"]
+    VS --> STT["STT streaming"]
+    STT --> IT["InterimTranscriptionFrame"]
+    IT --> TTD["Turn-taking decision"]
+    STT --> TF["TranscriptionFrame"]
+    TF --> CTX["LLM context update"]
+    TTD --> US["UserStartedSpeakingFrame"]
+    US --> GEN["LLM response generation"]
+    CTX --> GEN
+    GEN --> RE["LLMFullResponseEndFrame"]
+    RE --> TXT["TextFrame"]
+    TXT --> TTS["TTSAudioRawFrame"]
+    TTS --> BS["BotStoppedSpeakingFrame"]
 ```
 
 ---
@@ -193,42 +179,17 @@ The STT component uses **cache-aware streaming FastConformer** for real-time tra
 
 #### Cache-Aware Streaming Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                        CACHE-AWARE STREAMING ASR                                 │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                  │
-│  Audio Stream (16kHz)                                                            │
-│       │                                                                          │
-│       ▼                                                                          │
-│  ┌─────────────────┐                                                            │
-│  │ Feature Extract │  80ms chunks → Mel Spectrogram                            │
-│  │ (Log-Mel Filter)│                                                            │
-│  └────────┬────────┘                                                            │
-│           │                                                                      │
-│           ▼                                                                      │
-│  ┌─────────────────────────────────────────────────────────────────────┐        │
-│  │                    CONFORMER ENCODER                                │        │
-│  │  ┌──────────────────────────────────────────────────────────────┐  │        │
-│  │  │ Attention Cache (left_chunks=2)                              │  │        │
-│  │  │ ┌───────┐ ┌───────┐ ┌───────┐                               │  │        │
-│  │  │ │Chunk-2│ │Chunk-1│ │Current│ → Causal Self-Attention        │  │        │
-│  │  │ └───────┘ └───────┘ └───────┘                               │  │        │
-│  │  └──────────────────────────────────────────────────────────────┘  │        │
-│  │                                                                     │        │
-│  │  ┌──────────────────────────────────────────────────────────────┐  │        │
-│  │  │ Convolution Cache (pre_encode_cache)                         │  │        │
-│  │  │ → Maintains streaming consistency                            │  │        │
-│  │  └──────────────────────────────────────────────────────────────┘  │        │
-│  └─────────────────────────────────────────────────────────────────────┘        │
-│           │                                                                      │
-│           ▼                                                                      │
-│  ┌─────────────────┐                                                            │
-│  │  RNNT Decoder   │  → Outputs partial transcriptions                          │
-│  │  (Transducer)   │  → Detects End-of-Utterance (<EOU>)                       │
-│  └─────────────────┘                                                            │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["Audio stream (16 kHz)"] --> FE["Feature extraction<br/>log-Mel, 80 ms chunks"]
+    FE --> CE
+    subgraph CE["Conformer encoder (cache-aware)"]
+      direction TB
+      AC["Attention cache (left_chunks = 2)<br/>Chunk-2 + Chunk-1 + Current to causal self-attention"]
+      CC["Convolution cache (pre_encode_cache)<br/>maintains streaming consistency"]
+      AC --> CC
+    end
+    CE --> DEC["RNNT decoder (transducer)<br/>partial transcripts + End-of-Utterance (EOU)"]
 ```
 
 #### Configuration
@@ -283,34 +244,12 @@ The diarization component identifies different speakers in multi-speaker convers
 
 #### Streaming SortFormer Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    STREAMING SORTFORMER DIARIZATION                     │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Audio Frame (80ms)                                                     │
-│       │                                                                 │
-│       ▼                                                                 │
-│  ┌─────────────────┐                                                   │
-│  │ Feature Extract │  → Shared with ASR                                │
-│  └────────┬────────┘                                                   │
-│           │                                                             │
-│           ▼                                                             │
-│  ┌─────────────────┐                                                   │
-│  │ SortFormer      │  → Per-frame speaker embeddings                   │
-│  │ Encoder         │  → Supports up to 4 speakers                      │
-│  └────────┬────────┘                                                   │
-│           │                                                             │
-│           ▼                                                             │
-│  ┌─────────────────┐                                                   │
-│  │ Speaker         │  → Cosine similarity matching                     │
-│  │ Clustering      │  → Threshold: 0.4 (configurable)                  │
-│  └────────┬────────┘                                                   │
-│           │                                                             │
-│           ▼                                                             │
-│  DiarResultFrame(speaker_id=0|1|2|3)                                   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["Audio frame (80 ms)"] --> FE["Feature extraction (shared with ASR)"]
+    FE --> SF["Sortformer encoder<br/>per-frame speaker embeddings, up to 4 speakers"]
+    SF --> CL["Speaker clustering<br/>cosine similarity, threshold 0.4 (configurable)"]
+    CL --> OUT["DiarResultFrame (speaker_id = 0, 1, 2, 3)"]
 ```
 
 #### Configuration
@@ -344,55 +283,17 @@ The turn-taking component manages conversation flow, handling barge-in and backc
 
 #### Turn-Taking State Machine
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                         TURN-TAKING STATE MACHINE                              │
-├────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                │
-│  ┌──────────────┐                                                             │
-│  │   IDLE       │◀──────────────────────────────────────────┐                 │
-│  │ (Bot Ready)  │                                            │                 │
-│  └──────┬───────┘                                            │                 │
-│         │ VADUserStartedSpeakingFrame                        │                 │
-│         ▼                                                    │                 │
-│  ┌──────────────┐                                            │                 │
-│  │ USER_SPEAKING│                                            │                 │
-│  │ (Collecting) │──────┬────────────────────────────────────┐│                 │
-│  └──────┬───────┘      │                                    ││                 │
-│         │              │ is_backchannel?                    ││                 │
-│         │              ▼                                    ││                 │
-│         │       ┌──────────────┐                           ││                 │
-│         │       │ IGNORE       │ (No interrupt if bot is   ││                 │
-│         │       │ BACKCHANNEL  │  speaking: "네", "음")     ││                 │
-│         │       └──────────────┘                           ││                 │
-│         │                                                   ││                 │
-│         │ VADUserStoppedSpeakingFrame                       ││                 │
-│         │ + TranscriptionFrame (final)                      ││                 │
-│         ▼                                                   ││                 │
-│  ┌──────────────┐                                           ││                 │
-│  │ USER_TURN    │                                           ││                 │
-│  │ COMPLETE     │──────────────────────────────────────────┐││                 │
-│  └──────┬───────┘                                          │││                 │
-│         │ Emit UserStartedSpeakingFrame                    │││                 │
-│         ▼                                                  │││                 │
-│  ┌──────────────┐                                          │││                 │
-│  │ BOT_THINKING │                                          │││                 │
-│  │ (LLM Active) │                                          │││                 │
-│  └──────┬───────┘                                          │││                 │
-│         │ LLM starts streaming                             │││                 │
-│         ▼                                                  │││                 │
-│  ┌──────────────┐                                          │││                 │
-│  │ BOT_SPEAKING │◀─────────────────────────────────────────┘││                 │
-│  │ (TTS Active) │                                           ││                 │
-│  └──────┬───────┘                                           ││                 │
-│         │                                                   ││                 │
-│         ├── VADUserStartedSpeakingFrame (non-backchannel)  ││                 │
-│         │   └── BARGE-IN: Cancel TTS, return to IDLE ──────┘│                 │
-│         │                                                    │                 │
-│         │── BotStoppedSpeakingFrame                          │                 │
-│             └── Return to IDLE ──────────────────────────────┘                 │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> USER_SPEAKING: VADUserStartedSpeaking
+    USER_SPEAKING --> IGNORE_BACKCHANNEL: is backchannel (네, 음)
+    IGNORE_BACKCHANNEL --> USER_SPEAKING
+    USER_SPEAKING --> USER_TURN_COMPLETE: VADUserStopped + final transcript
+    USER_TURN_COMPLETE --> BOT_THINKING: emit UserStartedSpeaking
+    BOT_THINKING --> BOT_SPEAKING: LLM starts streaming
+    BOT_SPEAKING --> IDLE: BotStoppedSpeaking
+    BOT_SPEAKING --> IDLE: barge-in (non-backchannel) cancels TTS
 ```
 
 #### Configuration
@@ -434,35 +335,16 @@ The LLM component generates responses based on conversation context.
 
 #### Streaming Generation Flow
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                            LLM STREAMING GENERATION                            │
-├────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                │
-│  User Transcription                                                            │
-│       │                                                                        │
-│       ▼                                                                        │
-│  ┌─────────────────┐                                                          │
-│  │ Context Manager │  → Accumulates conversation history                       │
-│  │ (OpenAI Format) │  → System prompt + user/assistant messages               │
-│  └────────┬────────┘                                                          │
-│           │                                                                    │
-│           ▼                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────┐      │
-│  │                         vLLM / HuggingFace                          │      │
-│  │                                                                     │      │
-│  │  [Input Tokens] ──▶ [Token Generation] ──▶ [Output Tokens]         │      │
-│  │                          │                      │                   │      │
-│  │                          ▼                      ▼                   │      │
-│  │                    Streaming Output        TextFrame per token      │      │
-│  │                    (1-5ms per token)       (aggregated)             │      │
-│  │                                                                     │      │
-│  └─────────────────────────────────────────────────────────────────────┘      │
-│           │                                                                    │
-│           ▼                                                                    │
-│  TextFrame("안녕") → TextFrame("하세요") → ... → LLMFullResponseEndFrame      │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["User transcription"] --> CM["Context manager (OpenAI format)<br/>system prompt + user/assistant history"]
+    CM --> GEN
+    subgraph GEN["vLLM / HuggingFace"]
+      direction LR
+      IT["Input tokens"] --> TG["Token generation (1-5 ms / token)"]
+      TG --> OT["Output tokens to TextFrame per token"]
+    end
+    GEN --> OUT["TextFrame(안녕) to TextFrame(하세요) to ... to LLMFullResponseEndFrame"]
 ```
 
 #### Configuration
@@ -498,47 +380,18 @@ The TTS component converts LLM responses to natural speech with optional voice c
 
 #### TTS Streaming Architecture
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                           TTS SENTENCE CHUNKING                                │
-├────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                │
-│  LLM Token Stream                                                              │
-│       │                                                                        │
-│       ▼                                                                        │
-│  ┌─────────────────┐                                                          │
-│  │ Text Aggregator │  → Accumulates tokens until sentence boundary            │
-│  │ (Punctuation)   │  → Boundaries: .?!。？！\n                               │
-│  └────────┬────────┘                                                          │
-│           │                                                                    │
-│           │  Sentence: "안녕하세요."                                           │
-│           ▼                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────┐      │
-│  │                        Fish Speech API                              │      │
-│  │                                                                     │      │
-│  │  ┌───────────────┐                                                 │      │
-│  │  │ Text Encoder  │  → Phoneme conversion                          │      │
-│  │  │ (GPT-SoVITS)  │  → Semantic tokens                             │      │
-│  │  └───────┬───────┘                                                 │      │
-│  │          │                                                         │      │
-│  │          ▼                                                         │      │
-│  │  ┌───────────────┐                                                 │      │
-│  │  │ Voice Cloning │  → Reference audio embedding (VQ tokens)       │      │
-│  │  │ (Optional)    │  → Zero-shot voice transfer                    │      │
-│  │  └───────┬───────┘                                                 │      │
-│  │          │                                                         │      │
-│  │          ▼                                                         │      │
-│  │  ┌───────────────┐                                                 │      │
-│  │  │ Audio Decoder │  → 44.1kHz audio generation                    │      │
-│  │  │ (DAC Vocoder) │  → Streaming output                            │      │
-│  │  └───────────────┘                                                 │      │
-│  │                                                                     │      │
-│  └─────────────────────────────────────────────────────────────────────┘      │
-│           │                                                                    │
-│           ▼                                                                    │
-│  TTSAudioRawFrame (10ms chunks, 44.1kHz) ──▶ WebSocket ──▶ Client Speaker     │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["LLM token stream"] --> AGG["Text aggregator<br/>accumulate to sentence boundary (.?!。？！)"]
+    AGG --> FS
+    subgraph FS["Fish Speech API"]
+      direction TB
+      TE["Text encoder (GPT-SoVITS)<br/>phonemes + semantic tokens"]
+      VC["Voice cloning (optional)<br/>reference-audio VQ tokens, zero-shot"]
+      AD["Audio decoder (DAC vocoder)<br/>44.1 kHz, streaming"]
+      TE --> VC --> AD
+    end
+    FS --> OUT["TTSAudioRawFrame (10 ms chunks) to WebSocket to client speaker"]
 ```
 
 #### Configuration
@@ -634,49 +487,18 @@ tts:
 
 ### Complete Pipeline Flow (Full Mode)
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              COMPLETE DATA FLOW                                      │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                     │
-│  1. AUDIO INPUT                                                                     │
-│     User Speech (16kHz PCM) ──▶ WebSocket ──▶ AudioRawFrame                        │
-│                                                                                     │
-│  2. VAD PROCESSING                                                                  │
-│     AudioRawFrame ──▶ Silero VAD ──▶ VADUserStarted/StoppedSpeakingFrame           │
-│                                                                                     │
-│  3. STREAMING ASR                                                                   │
-│     AudioRawFrame ──▶ FastConformer ──▶ InterimTranscriptionFrame (partial)        │
-│                   └──▶ TranscriptionFrame (final with <EOU>)                       │
-│                                                                                     │
-│  4. SPEAKER DIARIZATION (optional)                                                  │
-│     AudioRawFrame ──▶ SortFormer ──▶ DiarResultFrame(speaker_id)                   │
-│                                                                                     │
-│  5. TURN-TAKING DECISION                                                            │
-│     TranscriptionFrame + VADStoppedFrame ──▶ UserStartedSpeakingFrame              │
-│     (Only if not backchannel and bot not speaking)                                 │
-│                                                                                     │
-│  6. CONTEXT AGGREGATION                                                             │
-│     UserStartedSpeakingFrame ──▶ LLMContextFrame (user message added)              │
-│                                                                                     │
-│  7. LLM GENERATION                                                                  │
-│     LLMContextFrame ──▶ LLM Service ──▶ TextFrame (streaming tokens)               │
-│                                     └──▶ LLMFullResponseEndFrame                   │
-│                                                                                     │
-│  8. TEXT AGGREGATION                                                                │
-│     TextFrame ──▶ SimpleSegmentedTextAggregator ──▶ Complete Sentences            │
-│                                                                                     │
-│  9. TTS SYNTHESIS                                                                   │
-│     Complete Sentence ──▶ Fish Speech API ──▶ TTSAudioRawFrame (44.1kHz)          │
-│                                                                                     │
-│  10. AUDIO OUTPUT                                                                   │
-│      TTSAudioRawFrame ──▶ WebSocket ──▶ Browser Audio Playback                     │
-│                                                                                     │
-│  11. CONTEXT UPDATE                                                                 │
-│      LLMFullResponseEndFrame ──▶ Assistant Context Aggregator                      │
-│      (Assistant message saved to conversation history)                             │
-│                                                                                     │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A1["1. Audio input: 16 kHz PCM to WebSocket to AudioRawFrame"] --> A2["2. VAD (Silero): VADUserStarted/StoppedSpeakingFrame"]
+    A2 --> A3["3. Streaming ASR (FastConformer): interim + final TranscriptionFrame (EOU)"]
+    A3 --> A4["4. Diarization (Sortformer, optional): DiarResultFrame(speaker_id)"]
+    A4 --> A5["5. Turn-taking: UserStartedSpeakingFrame (if not backchannel)"]
+    A5 --> A6["6. Context aggregation: LLMContextFrame"]
+    A6 --> A7["7. LLM generation: streaming TextFrame + LLMFullResponseEndFrame"]
+    A7 --> A8["8. Text aggregation: complete sentences"]
+    A8 --> A9["9. TTS synthesis: TTSAudioRawFrame (44.1 kHz)"]
+    A9 --> A10["10. Audio output: WebSocket to browser playback"]
+    A10 --> A11["11. Context update: assistant message saved"]
 ```
 
 ### Latency Breakdown
@@ -966,41 +788,15 @@ The client accepts WAV files with:
 
 ### Interruption Handling Flow
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                           BARGE-IN HANDLING                                    │
-├────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                │
-│  Bot Speaking (TTS Active)                                                     │
-│       │                                                                        │
-│       │ User starts speaking (VADUserStartedSpeakingFrame)                     │
-│       ▼                                                                        │
-│  ┌─────────────────┐                                                          │
-│  │ Is Backchannel? │                                                          │
-│  └────────┬────────┘                                                          │
-│           │                                                                    │
-│     ┌─────┴─────┐                                                             │
-│     │           │                                                             │
-│     ▼           ▼                                                             │
-│   Yes          No                                                             │
-│     │           │                                                             │
-│     ▼           ▼                                                             │
-│  ┌──────────┐  ┌──────────────────────────────────────────────────────┐       │
-│  │ Ignore   │  │ BARGE-IN TRIGGERED                                  │       │
-│  │ Continue │  │                                                      │       │
-│  │ Bot TTS  │  │  1. Emit StartInterruptionFrame                     │       │
-│  └──────────┘  │     └─▶ Cancel TTS generation                       │       │
-│                │     └─▶ Flush audio output buffer                   │       │
-│                │                                                      │       │
-│                │  2. Emit BotStoppedSpeakingFrame                    │       │
-│                │     └─▶ Reset bot speaking state                    │       │
-│                │                                                      │       │
-│                │  3. Process User Speech                             │       │
-│                │     └─▶ Continue with STT → LLM → TTS               │       │
-│                │                                                      │       │
-│                └──────────────────────────────────────────────────────┘       │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A["Bot speaking (TTS active)"] --> B["User starts speaking (VADUserStartedSpeakingFrame)"]
+    B --> C{"Is backchannel?"}
+    C -->|"Yes"| D["Ignore - continue bot TTS"]
+    C -->|"No"| E["Barge-in triggered"]
+    E --> E1["1. StartInterruptionFrame: cancel TTS + flush audio buffer"]
+    E1 --> E2["2. BotStoppedSpeakingFrame: reset bot speaking state"]
+    E2 --> E3["3. Process user speech: STT to LLM to TTS"]
 ```
 
 ### Backchannel Detection
